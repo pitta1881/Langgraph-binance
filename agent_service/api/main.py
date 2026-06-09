@@ -7,6 +7,8 @@ only owns the LLM orchestration.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -29,18 +31,45 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Crypto Agent Service")
 graph = build_chat_graph()
+
+
+def _regenerate_graph_png() -> None:
+    """Refresh `artifacts/graph.png` from the compiled LangGraph at startup.
+
+    Uses LangGraph's `draw_mermaid_png` which calls out to mermaid.ink. If
+    that fails (no network, throttled endpoint), we log and continue —
+    refreshing the diagram must never block the service from starting.
+    """
+    try:
+        out = Path(__file__).resolve().parents[2] / "artifacts" / "graph.png"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        png = graph.get_graph().draw_mermaid_png()
+        out.write_bytes(png)
+        logger.info("Graph artifact updated: %s (%d bytes)", out, len(png))
+    except Exception as exc:
+        logger.warning("Could not regenerate graph.png: %s", exc)
+
+
+_regenerate_graph_png()
 logger.info("Crypto Agent Service started — graph compiled")
 
 
 class RunAgentRequest(BaseModel):
     message: str
+    history: list[dict[str, Any]] | None = None
 
 
 @app.post("/run-agent")
 async def run_agent(req: RunAgentRequest) -> dict:
-    logger.debug("run_agent received: %r", req.message)
-    state = await graph.ainvoke({"user_message": req.message})
-    logger.debug("run_agent finished — state keys: %s", list(state.keys()))
+    history = req.history or []
+    logger.debug("run_agent received: msg=%r, history_turns=%d",
+                 req.message, len(history))
+    state = await graph.ainvoke({
+        "user_message": req.message,
+        "history": history,
+    })
+    logger.debug("run_agent finished — intent=%s symbol=%s",
+                 state.get("intent"), state.get("symbol"))
     return dict(state)
 
 
