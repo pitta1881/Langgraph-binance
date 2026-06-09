@@ -130,6 +130,46 @@ def _resolve_symbol(text: str) -> str | None:
     return None
 
 
+def _last_symbol_from_history(history: list[dict] | None) -> str | None:
+    """Return the most recent non-null assistant `symbol` from history.
+
+    Used as a last-resort fallback in the intent_router: if neither the
+    pattern matcher nor the LLM detect a symbol in the current user message,
+    we carry over the symbol from the previous assistant turn. This makes
+    "es buen momento para comprar?" after "¿qué es SOL?" resolve to SOL.
+    """
+    if not history:
+        return None
+    for turn in reversed(history):
+        if turn.get("role") == "assistant" and turn.get("symbol"):
+            return turn["symbol"]
+    return None
+
+
+def _format_history_for_router(history: list[dict] | None, max_turns: int = 20) -> str:
+    """Render the last N turns as a compact context block for the LLM.
+
+    Keeps each entry to a single line. Only the symbol/intent matter for
+    assistant turns; the full review text would just confuse the router.
+    """
+    if not history:
+        return ""
+    recent = history[-max_turns:]
+    lines: list[str] = []
+    for i, turn in enumerate(recent, start=1):
+        role = turn.get("role", "?")
+        if role == "user":
+            content = (turn.get("content") or "").strip()
+            if len(content) > 200:
+                content = content[:200] + "..."
+            lines.append(f"  {i}. Usuario: {content}")
+        else:
+            sym = turn.get("symbol") or "—"
+            intent = turn.get("intent") or "—"
+            lines.append(f"  {i}. Bot: respondió sobre {sym} (intent={intent})")
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------------------------
 # intent_router
 # ---------------------------------------------------------------------------
@@ -137,22 +177,29 @@ def _resolve_symbol(text: str) -> str | None:
 
 async def intent_router(state: ChatState) -> ChatState:
     user_message = state.get("user_message", "")
+    history = state.get("history") or []
     symbol = _resolve_symbol(user_message)
+    history_block = _format_history_for_router(history)
 
-    system = SystemMessage(
-        content=(
-            "You classify user messages about crypto into intents. "
-            "Respond with ONLY a JSON object: {\"intent\": \"...\", \"symbol\": \"...\"}\n"
-            "Intents:\n"
-            "- price_only: user asks for price\n"
-            "- analysis: user asks for analysis, prediction, recommendation\n"
-            "- market_overview: user asks about the general market, trending, top movers\n"
-            "- coin_info: user asks what a coin IS, its fundamentals, what it does\n"
-            "- no_symbol: cannot determine which coin\n\n"
-            "If you detect a symbol, return it as XXXUSDT format.\n"
-            "Always respond in Spanish. No greetings or filler."
-        )
-    )
+    system_parts = [
+        "You classify user messages about crypto into intents. "
+        "Respond with ONLY a JSON object: {\"intent\": \"...\", \"symbol\": \"...\"}\n"
+        "Intents:\n"
+        "- price_only: user asks for price\n"
+        "- analysis: user asks for analysis, prediction, recommendation\n"
+        "- market_overview: user asks about the general market, trending, top movers\n"
+        "- coin_info: user asks what a coin IS, its fundamentals, what it does\n"
+        "- no_symbol: cannot determine which coin\n\n"
+        "If you detect a symbol, return it as XXXUSDT format.\n"
+        "If the user makes an implicit reference (pronouns, omitted symbol like "
+        "'comprar', 'subió?', 'y la semana?'), reuse the symbol from the most "
+        "recent assistant turn in the conversation context below. "
+        "Explicit symbols in the current message always win over context.\n"
+        "Always respond in Spanish. No greetings or filler."
+    ]
+    if history_block:
+        system_parts.append("\n\nConversation context (oldest first):\n" + history_block)
+    system = SystemMessage(content="".join(system_parts))
     user = HumanMessage(content=user_message)
 
     try:
@@ -171,6 +218,16 @@ async def intent_router(state: ChatState) -> ChatState:
 
         if llm_symbol and not symbol:
             symbol = _resolve_symbol(llm_symbol) or llm_symbol
+
+        # Carryover: if we still don't know the symbol but the conversation
+        # has one, use it and upgrade `no_symbol` to a real intent.
+        if not symbol:
+            carry = _last_symbol_from_history(history)
+            if carry:
+                symbol = carry
+                if intent == "no_symbol":
+                    intent = "analysis"
+                logger.info("intent_router: symbol carryover from history -> %s", carry)
 
         if intent in ("price_only", "analysis", "coin_info") and not symbol:
             intent = "no_symbol"
