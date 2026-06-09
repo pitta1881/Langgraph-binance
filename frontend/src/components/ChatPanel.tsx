@@ -8,8 +8,10 @@ import {
 } from "react";
 import type { KeyboardEvent } from "react";
 import ReactMarkdown from "react-markdown";
-import type { ChatRequest, ChatResponse } from "../../../shared/types/chat.ts";
+import type { ChatRequest, ChatResponse, ConversationTurn } from "../../../shared/types/chat.ts";
 import type { Kline } from "../../../shared/types/market.ts";
+
+const MAX_HISTORY_TURNS = 20;
 import { postJson, getJson } from "../api";
 import { extractSymbol } from "../utils/symbols";
 import { CandleChart } from "./CandleChart";
@@ -23,7 +25,27 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   symbol?: string | null;
+  intent?: string;
   klines?: Kline[] | null;
+}
+
+/**
+ * Build the compact conversation history the gateway forwards to the agent.
+ *
+ * For user messages we send the raw text. For assistant messages we send
+ * ONLY the resolved symbol + intent — the reviewer text would just bloat
+ * the prompt without giving the intent_router useful signal.
+ */
+function buildHistory(messages: Message[]): ConversationTurn[] {
+  return messages.slice(-MAX_HISTORY_TURNS).map((m) =>
+    m.role === "user"
+      ? { role: "user" as const, content: m.content }
+      : {
+          role: "assistant" as const,
+          symbol: m.symbol ?? null,
+          intent: m.intent,
+        },
+  );
 }
 
 export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) {
@@ -76,13 +98,16 @@ export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) 
     setLoading(true);
 
     try {
+      const history = buildHistory(messages);
       const data = await postJson<ChatResponse, ChatRequest>(
         "/chat",
-        { message: text },
+        { message: text, history },
         { signal: controller.signal }
       );
 
-      const symbol = extractSymbol(text);
+      // Prefer the symbol the agent actually resolved (it may carry over from
+      // history); fall back to the local pattern matcher for older responses.
+      const symbol = data.symbol ?? extractSymbol(text);
       let klines: Kline[] | null = null;
 
       if (symbol) {
@@ -102,6 +127,7 @@ export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) 
         role: "assistant",
         content: data.response,
         symbol,
+        intent: data.intent,
         klines,
       };
       setMessages((prev) => [...prev, assistantMsg]);
