@@ -1,0 +1,58 @@
+.heatmap {
+  background: #111118;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.heatmap__title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #a0a0b0;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 10px;
+}
+
+.heatmap__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3px;
+}
+
+.heatmap__cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 4px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: transform 0.15s, filter 0.15s;
+  min-height: 56px;
+}
+
+.heatmap__cell:hover {
+  transform: scale(1.06);
+  filter: brightness(1.35);
+  z-index: 1;
+  position: relative;
+}
+
+.heatmap__cell:focus-visible {
+  outline: 2px solid #4fc3f7;
+  outline-offset: 1px;
+}
+
+.heatmap__symbol {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: 0.01em;
+}
+
+.heatmap__change {
+  font-size: 0.62rem;
+  color: rgba(255, 255, 255, 0.75);
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
