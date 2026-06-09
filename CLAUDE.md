@@ -89,16 +89,21 @@ Frontend (Vite :5173)
 
 - **`src/server.ts`** — Fastify bootstrap with Pino (`pino-pretty` in dev), `@fastify/env`, `@fastify/cors`, TypeBox type provider.
 - **`src/config.ts`** — `ConfigSchema` (TypeBox) defines and validates env at startup.
-- **`src/clients/`** — `binance.ts`, `coingecko.ts`, `pythonAgent.ts`. Each one is instantiated per request with the current `request.log` so logs are correlated with `reqId`.
-- **`src/schemas/`** — TypeBox schemas. `market.ts` shapes match what the React components consume; `chat.ts` includes `AgentStateSchema` mirroring the Python `ChatState` for debug logging.
-- **`src/routes/`** — one file per endpoint. All use `FastifyPluginAsyncTypebox` so request/response are typed and validated.
+- **`src/clients/`** — `binance.ts`, `coingecko.ts`, `pythonAgent.ts`. Registered as Fastify decorators via `src/plugins/`, instantiated once at startup. Methods accept an optional `request.log` so logs stay correlated with `reqId`.
+- **`src/plugins/`** — one Fastify plugin per client (`fastify-plugin` wrapper + `decorate` + module augmentation). Registered in `server.ts` BEFORE the routes.
+- **`src/clients/_fetch.ts`** — `fetchWithTimeout` (AbortController) used by every upstream call.
+- **`src/clients/_errors.ts`** — `UpstreamParseError`, `UpstreamShapeError`, `InvalidSymbolError`.
+- **`src/utils/parseNum.ts`** — strict `Number()` replacement that throws on NaN.
+- **`src/utils/market.ts`** — `topByVolume` used by `heatmap` and `tickerBanner` routes.
+- **`src/schemas/`** — TypeBox schemas. `market.ts` defines `Ticker`/`Kline`/`TrendingCoin` shapes (validated runtime) plus assignability checks against the shared interfaces. `chat.ts` defines `ChatRequest` (with optional `history`) / `ChatResponse` (with optional `intent`, `symbol`).
+- **`src/routes/`** — one file per endpoint. All use `FastifyPluginAsyncTypebox` so request/response are typed and validated. `klines` interval is a TypeBox literal union so invalid values get a 400 with a clear message (not a fake "Invalid symbol").
 
 ### Agent Service (`agent_service/`)
 
-- **`api/main.py`** — minimal FastAPI app exposing only `POST /run-agent` and `GET /health`. Compiles the graph once at startup.
+- **`api/main.py`** — minimal FastAPI app exposing only `POST /run-agent` and `GET /health`. Compiles the graph once at startup AND calls `_regenerate_graph_png()` so `artifacts/graph.png` reflects the current pipeline every time the service boots. Failure of the regeneration is logged at warning level and does not block startup.
 - **`agents/chat/graph.py`** — LangGraph `StateGraph` definition.
-- **`agents/chat/nodes.py`** — async node functions updating `ChatState`. Uses `binance/` and `coingecko.py` internally (price_fetcher, market_scout, coin_info nodes).
-- **`agents/shared/state.py`** — `ChatState` TypedDict with all 13 optional fields.
+- **`agents/chat/nodes.py`** — async node functions updating `ChatState`. Uses `binance/` and `coingecko.py` internally (price_fetcher, market_scout, coin_info nodes). `intent_router` is the only node that consumes `state["history"]` for symbol carryover.
+- **`agents/shared/state.py`** — `ChatState` TypedDict; includes `history: list[ConversationTurn]` for conversation memory.
 
 LangGraph flow:
 ```
@@ -115,16 +120,34 @@ intent_router
 
 ### Contract between Gateway and Agent
 
-- Gateway sends: `POST :8001/run-agent { "message": string }`
+- Gateway sends: `POST :8001/run-agent { "message": string, "history"?: ConversationTurn[] }`
 - Agent returns: full `ChatState` serialized as JSON (every field optional).
-- Gateway flattens to `{ "response": string }` for the frontend. The full state is logged at debug level (`request.log.debug({ state }, ...)`) so the entire agent run can be traced from gateway logs alone.
+- Gateway flattens to `{ "response": string, "intent"?: string, "symbol"?: string | null }` for the frontend. `intent` and `symbol` are exposed so the frontend can stash them on the assistant message and replay them as compact history on the next turn. The full state is logged with `{intent, symbol, responseLength}` at debug level (NOT the full state — that includes kline arrays).
+
+### Conversation memory
+
+The chat is **client-side stateful**. The frontend (`ChatPanel.tsx`) keeps its `messages: Message[]` array and on every `POST /chat` builds a compact `history` via `buildHistory()`:
+
+- User turns send `{role: 'user', content: <text>}`.
+- Assistant turns send only `{role: 'assistant', symbol, intent}` — the long reviewer text is NOT sent. The router only needs the symbol to resolve implicit references.
+
+Only the `intent_router` node consumes `state["history"]`. It does two things:
+
+1. Renders the history as a Spanish context block in the system prompt so Gemini can resolve pronouns and elisions.
+2. If neither the pattern matcher nor the LLM produced a symbol for the current turn, `_last_symbol_from_history()` runs as a final fallback and carries over the most recent assistant symbol. This is what makes "es buen momento para comprar?" resolve to SOL after the user previously asked "¿qué es SOL?".
+
+History is capped at 20 turns (`MAX_HISTORY_TURNS` in `ChatPanel.tsx`). Refreshing the browser resets the conversation — there is no server-side store.
+
+The shared shapes live at `shared/types/chat.ts` (`ConversationTurn`, extended `ChatRequest`/`ChatResponse`). Both the gateway TypeBox schemas and the frontend hooks reference them.
 
 ### Frontend
 
-- **`App.jsx`** — `TickerBanner` (top), sidebar (ConversationHistory + Heatmap + TrendingPanel), main area (ChatPanel).
-- **`ChatPanel.jsx`** — ref-forwarded; `injectText(ticker)` and `reset()` let sidebar components inject coin symbols into chat.
-- `/api/*` requests are proxied by Vite (`vite.config.js`) to `localhost:8000` (the gateway).
-- Clicking a coin in Heatmap or TrendingPanel calls `chatRef.current.injectText(ticker)`, which auto-populates and submits the chat input.
+- **`App.tsx`** — `TickerBanner` (top), sidebar (Heatmap + TrendingPanel), main area (ChatPanel). Below 768px the sidebar collapses behind a hamburger button and slides in as an overlay drawer.
+- **`ChatPanel.tsx`** — ref-forwarded; `injectText(ticker)` lets sidebar components inject coin symbols into chat. Cancels the previous in-flight request via `abortRef` when a new send fires.
+- **`src/api.ts`** — `API_BASE` + `getJson`/`postJson` helpers (single source of truth for the gateway URL).
+- **`src/hooks/{useFetch,usePolling}.ts`** — `AbortController`-aware data hooks used by every sidebar panel.
+- **`src/styles/tokens.css`** — centralized CSS variables; no hex literals scattered across component CSS files.
+- `/api/*` requests are proxied by Vite (`vite.config.ts`) to `localhost:8000` (the gateway).
 
 No UI component library — custom CSS per component.
 
