@@ -1,5 +1,5 @@
 import type { FastifyBaseLogger } from 'fastify';
-import type { AgentState } from '../../../shared/types/chat.ts';
+import type { AgentState, ConversationTurn } from '../../../shared/types/chat.ts';
 import { UpstreamParseError } from './_errors.ts';
 import { fetchWithTimeout } from './_fetch.ts';
 import { AGENT_FETCH_TIMEOUT_MS } from '../constants.ts';
@@ -22,17 +22,26 @@ export class PythonAgentClient {
     this.log = log;
   }
 
-  async runAgent(message: string, log?: FastifyBaseLogger): Promise<AgentState> {
+  async runAgent(
+    message: string,
+    history?: ConversationTurn[],
+    log?: FastifyBaseLogger,
+  ): Promise<AgentState> {
     const logger = log ?? this.log;
     const url = `${this.baseUrl}/run-agent`;
-    logger.debug({ url, message }, 'pythonAgent: dispatching');
+    const historyTurns = history?.length ?? 0;
+    logger.debug({ url, message, historyTurns }, 'pythonAgent: dispatching');
+
+    const body = history && history.length > 0
+      ? { message, history }
+      : { message };
 
     const res = await fetchWithTimeout(
       url,
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify(body),
       },
       AGENT_FETCH_TIMEOUT_MS,
     );

@@ -1,8 +1,24 @@
 import { Type, type Static } from '@sinclair/typebox';
-import type { ChatRequest as SharedChatRequest, ChatResponse as SharedChatResponse, AgentState as SharedAgentState } from '../../../shared/types/chat.ts';
+import type {
+  ChatRequest as SharedChatRequest,
+  ChatResponse as SharedChatResponse,
+  AgentState as SharedAgentState,
+  ConversationTurn as SharedConversationTurn,
+} from '../../../shared/types/chat.ts';
+
+export const ConversationTurnSchema = Type.Object({
+  role: Type.Union([Type.Literal('user'), Type.Literal('assistant')]),
+  content: Type.Optional(Type.String()),
+  symbol: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  intent: Type.Optional(Type.String()),
+});
+export type ConversationTurn = Static<typeof ConversationTurnSchema>;
+const _turnCheck: SharedConversationTurn = {} as ConversationTurn;
+void _turnCheck;
 
 export const ChatRequestSchema = Type.Object({
   message: Type.String({ minLength: 1 }),
+  history: Type.Optional(Type.Array(ConversationTurnSchema, { maxItems: 20 })),
 });
 export type ChatRequest = Static<typeof ChatRequestSchema>;
 const _chatRequestCheck: SharedChatRequest = {} as ChatRequest;
@@ -10,6 +26,8 @@ void _chatRequestCheck;
 
 export const ChatResponseSchema = Type.Object({
   response: Type.String(),
+  intent: Type.Optional(Type.String()),
+  symbol: Type.Optional(Type.Union([Type.String(), Type.Null()])),
 });
 export type ChatResponse = Static<typeof ChatResponseSchema>;
 const _chatResponseCheck: SharedChatResponse = {} as ChatResponse;

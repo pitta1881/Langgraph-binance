@@ -16,7 +16,8 @@ export const chatRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
     },
     async (request, reply) => {
       try {
-        const state = await fastify.pythonAgent.runAgent(request.body.message, request.log);
+        const { message, history } = request.body;
+        const state = await fastify.pythonAgent.runAgent(message, history, request.log);
         request.log.debug(
           {
             intent: state.intent,
@@ -29,7 +30,13 @@ export const chatRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
           request.log.warn({ intent: state.intent, symbol: state.symbol }, 'chat: agent returned no response');
           return reply.code(502).send({ detail: 'Agent returned no response' });
         }
-        return { response: state.response };
+        // Expose intent/symbol so the frontend can stash them on the assistant
+        // message and replay them as compact history on the next turn.
+        return {
+          response: state.response,
+          intent: state.intent,
+          symbol: state.symbol ?? null,
+        };
       } catch (err) {
         request.log.error({ err }, 'chat: agent call failed');
         return reply.code(502).send({
