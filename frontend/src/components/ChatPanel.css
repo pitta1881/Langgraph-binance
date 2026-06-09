@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #0d0d14;
+  background: var(--bg-chat);
 }
 
 .chat__messages {
@@ -12,17 +12,6 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  scrollbar-width: thin;
-  scrollbar-color: #1e1e30 transparent;
-}
-
-.chat__messages::-webkit-scrollbar {
-  width: 4px;
-}
-
-.chat__messages::-webkit-scrollbar-thumb {
-  background: #1e1e30;
-  border-radius: 2px;
 }
 
 /* Empty state */
@@ -33,7 +22,7 @@
   justify-content: center;
   flex: 1;
   text-align: center;
-  color: #666;
+  color: var(--text-muted);
   padding: 40px 24px;
 }
 
@@ -74,7 +63,7 @@
 }
 
 .chat__suggestions button:hover {
-  background: #1e1e32;
+  background: var(--bg-raised);
   color: #d0d0e8;
   border-color: #3a3a58;
 }
@@ -106,16 +95,16 @@
 }
 
 .chat__message--user .chat__bubble {
-  background: #1e3f62;
+  background: var(--bg-elev-bubble);
   color: #e0e8f0;
-  border-bottom-right-radius: 4px;
+  border-bottom-right-radius: var(--radius-sm);
 }
 
 .chat__message--assistant .chat__bubble {
-  background: #16161f;
+  background: var(--bg-raised);
   color: #c8c8dc;
-  border-bottom-left-radius: 4px;
-  border: 1px solid #1e1e30;
+  border-bottom-left-radius: var(--radius-sm);
+  border: 1px solid var(--border);
 }
 
 .chat__bubble a {
@@ -163,13 +152,13 @@
   gap: 8px;
   padding: 14px 16px;
   border-top: 1px solid #1a1a2a;
-  background: #0a0a12;
+  background: var(--bg-input);
 }
 
 .chat__input {
   flex: 1;
-  background: #13131e;
-  color: #e0e0e0;
+  background: var(--bg-textarea);
+  color: var(--text-primary);
   border: 1px solid #22223a;
   border-radius: 10px;
   padding: 10px 14px;
@@ -189,7 +178,7 @@
 }
 
 .chat__send {
-  background: #1e3f62;
+  background: var(--bg-elev-bubble);
   color: #c0d8f0;
   border: none;
   border-radius: 10px;
@@ -242,14 +231,14 @@
 .chat__bubble code {
   background: #0d0d16;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 0.83em;
-  border: 1px solid #1e1e30;
+  border: 1px solid var(--border);
 }
 
 .chat__bubble pre {
   background: #0d0d16;
-  border: 1px solid #1e1e30;
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 12px;
   overflow-x: auto;

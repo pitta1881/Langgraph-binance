@@ -1,16 +1,8 @@
-.trending {
-  background: #111118;
-  border-radius: 8px;
-  padding: 12px;
-}
-
-.trending__title {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #a0a0b0;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 10px;
+.trending__status {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 12px 0;
 }
 
 .trending__list {
@@ -30,7 +22,7 @@
 }
 
 .trending__item:hover {
-  background: #1a1a2e;
+  background: var(--bg-raised);
 }
 
 .trending__item:focus-visible {
@@ -40,7 +32,7 @@
 
 .trending__rank {
   font-size: 0.68rem;
-  color: #50506a;
+  color: var(--text-faint);
   width: 20px;
   text-align: right;
   flex-shrink: 0;
@@ -60,7 +52,7 @@
 
 .trending__name {
   font-size: 0.8rem;
-  color: #d8d8e8;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -68,11 +60,11 @@
 
 .trending__symbol {
   font-size: 0.68rem;
-  color: #70708a;
+  color: var(--text-secondary);
 }
 
 .trending__mcap {
   font-size: 0.68rem;
-  color: #50506a;
+  color: var(--text-faint);
   flex-shrink: 0;
 }

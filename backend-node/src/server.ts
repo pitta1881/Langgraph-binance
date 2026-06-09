@@ -6,7 +6,10 @@ import {
   TypeBoxValidatorCompiler,
 } from '@fastify/type-provider-typebox';
 
-import { ConfigSchema, type Config } from './config.ts';
+import { ConfigSchema } from './config.ts';
+import { binanceClientPlugin } from './plugins/binance.ts';
+import { coingeckoClientPlugin } from './plugins/coingecko.ts';
+import { pythonAgentClientPlugin } from './plugins/pythonAgent.ts';
 import { chatRoutes } from './routes/chat.ts';
 import { healthRoutes } from './routes/health.ts';
 import { heatmapRoutes } from './routes/heatmap.ts';
@@ -18,13 +21,11 @@ import { trendingRoutes } from './routes/trending.ts';
  * Boots the Fastify gateway.
  *
  * Order matters: env first (we need PORT/LOG_LEVEL before anything else),
- * then CORS, then routes. Each plugin is awaited so a failure here means the
- * process exits with a non-zero code instead of accepting traffic in a broken
- * state.
+ * then client plugins (they read from fastify.config), then CORS, then routes.
+ * Each plugin is awaited so a failure here means the process exits with a
+ * non-zero code instead of accepting traffic in a broken state.
  */
 async function buildServer() {
-  // Pino formatting: pretty in dev so logs are readable in the terminal,
-  // raw JSON in prod for log aggregators.
   const isDev = process.env.NODE_ENV !== 'production';
   const transport = isDev
     ? {
@@ -52,6 +53,12 @@ async function buildServer() {
     confKey: 'config',
   });
 
+  // Client plugins — constructed once per app lifetime; visible to all routes
+  // because fastify-plugin bypasses Fastify's encapsulation scope.
+  await fastify.register(binanceClientPlugin);
+  await fastify.register(coingeckoClientPlugin);
+  await fastify.register(pythonAgentClientPlugin);
+
   await fastify.register(fastifyCors, {
     origin: true,
     credentials: true,
@@ -68,12 +75,11 @@ async function buildServer() {
 }
 
 const fastify = await buildServer();
-const config = fastify.config as Config;
 
 try {
-  await fastify.listen({ port: config.PORT, host: config.HOST });
+  await fastify.listen({ port: fastify.config.PORT, host: fastify.config.HOST });
   fastify.log.info(
-    { port: config.PORT, pythonAgent: config.PYTHON_AGENT_URL },
+    { port: fastify.config.PORT, pythonAgent: fastify.config.PYTHON_AGENT_URL },
     'Gateway ready',
   );
 } catch (err) {

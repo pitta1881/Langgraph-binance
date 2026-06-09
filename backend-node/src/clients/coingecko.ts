@@ -1,5 +1,8 @@
 import type { FastifyBaseLogger } from 'fastify';
-import type { TrendingCoin } from '../schemas/market.ts';
+import type { TrendingCoin } from '../../../shared/types/market.ts';
+import { UpstreamParseError } from './_errors.ts';
+import { fetchWithTimeout } from './_fetch.ts';
+import { parseNum } from '../utils/parseNum.ts';
 
 /**
  * CoinGecko thin client.
@@ -9,35 +12,6 @@ import type { TrendingCoin } from '../schemas/market.ts';
  * node) — duplicating the HTTP shape is the right cost to keep services
  * decoupled.
  */
-export class CoingeckoClient {
-  constructor(
-    private readonly baseUrl: string,
-    private readonly apiKey: string,
-    private readonly log: FastifyBaseLogger,
-  ) {}
-
-  /** Top trending coins. Used by the sidebar TrendingPanel. */
-  async getTrending(): Promise<TrendingCoin[]> {
-    const url = `${this.baseUrl}/api/v3/search/trending`;
-    const headers: Record<string, string> = {};
-    if (this.apiKey) headers['x-cg-demo-api-key'] = this.apiKey;
-
-    this.log.debug({ url }, 'coingecko: fetching trending');
-    const res = await fetch(url, { headers });
-    if (!res.ok) throw new Error(`CoinGecko trending failed: ${res.status}`);
-    const json = (await res.json()) as { coins?: Array<{ item: TrendingCoinItem }> };
-
-    const coins = (json.coins ?? []).slice(0, 10).map(({ item }) => ({
-      name: item.name,
-      symbol: item.symbol,
-      market_cap_rank: item.market_cap_rank ?? null,
-      thumb: item.thumb ?? '',
-      price_btc: Number(item.price_btc ?? 0),
-    }));
-    this.log.debug({ count: coins.length }, 'coingecko: trending parsed');
-    return coins;
-  }
-}
 
 interface TrendingCoinItem {
   name: string;
@@ -45,4 +19,45 @@ interface TrendingCoinItem {
   market_cap_rank: number | null;
   thumb?: string;
   price_btc?: number | string;
+}
+
+export class CoingeckoClient {
+  private readonly log: FastifyBaseLogger;
+
+  constructor(
+    private readonly baseUrl: string,
+    private readonly apiKey: string,
+    log: FastifyBaseLogger,
+  ) {
+    this.log = log;
+  }
+
+  /** Top trending coins. Used by the sidebar TrendingPanel. */
+  async getTrending(log?: FastifyBaseLogger): Promise<TrendingCoin[]> {
+    const logger = log ?? this.log;
+    const url = `${this.baseUrl}/api/v3/search/trending`;
+    const headers: Record<string, string> = {};
+    if (this.apiKey) headers['x-cg-demo-api-key'] = this.apiKey;
+
+    logger.debug({ url }, 'coingecko: fetching trending');
+    const res = await fetchWithTimeout(url, { headers });
+    if (!res.ok) throw new Error(`CoinGecko trending failed: ${res.status}`);
+
+    let json: { coins?: Array<{ item: TrendingCoinItem }> };
+    try {
+      json = (await res.json()) as { coins?: Array<{ item: TrendingCoinItem }> };
+    } catch {
+      throw new UpstreamParseError({ url, status: res.status });
+    }
+
+    const coins = (json.coins ?? []).slice(0, 10).map(({ item }) => ({
+      name: item.name,
+      symbol: item.symbol,
+      market_cap_rank: item.market_cap_rank ?? null,
+      thumb: item.thumb ?? '',
+      price_btc: parseNum(item.price_btc ?? 0, 'price_btc', url),
+    }));
+    logger.debug({ count: coins.length }, 'coingecko: trending parsed');
+    return coins;
+  }
 }

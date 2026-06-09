@@ -1,11 +1,21 @@
 .ticker-banner {
-  background: #0d0d14;
-  border-bottom: 1px solid #1e1e30;
+  background: var(--bg-chat);
+  border-bottom: 1px solid var(--border);
   overflow: hidden;
   height: 38px;
   display: flex;
   align-items: center;
   flex-shrink: 0;
+}
+
+.ticker-banner--skeleton {
+  opacity: 0.5;
+}
+
+.ticker-banner__loading {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  padding: 0 16px;
 }
 
 .ticker-banner__track {
@@ -15,7 +25,8 @@
   white-space: nowrap;
 }
 
-.ticker-banner__track:hover {
+.ticker-banner__track:hover,
+.ticker-banner__track:focus-within {
   animation-play-state: paused;
 }
 
@@ -25,17 +36,17 @@
   align-items: center;
   font-size: 0.78rem;
   padding: 0 20px;
-  border-right: 1px solid #1e1e30;
+  border-right: 1px solid var(--border);
 }
 
 .ticker-banner__symbol {
-  color: #a0a0b8;
+  color: var(--text-secondary);
   font-weight: 700;
   letter-spacing: 0.02em;
 }
 
 .ticker-banner__price {
-  color: #d0d0e0;
+  color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -45,11 +56,11 @@
 }
 
 .ticker-banner__change--up {
-  color: #00c853;
+  color: var(--green);
 }
 
 .ticker-banner__change--down {
-  color: #ff1744;
+  color: var(--red);
 }
 
 @keyframes ticker-scroll {

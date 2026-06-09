@@ -1,7 +1,6 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { Type } from '@sinclair/typebox';
-
-import { BinanceClient, InvalidSymbolError } from '../clients/binance.ts';
+import { InvalidSymbolError } from '../clients/_errors.ts';
 import { KlineSchema, KlinesQuerySchema, SymbolParamSchema } from '../schemas/market.ts';
 
 export const klinesRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
@@ -20,13 +19,13 @@ export const klinesRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
     async (request, reply) => {
       const { symbol } = request.params;
       const { interval, limit } = request.query;
-      const binance = new BinanceClient(fastify.config.BINANCE_BASE_URL, request.log);
       try {
-        return await binance.getKlines(symbol.toUpperCase(), interval, limit);
+        return await fastify.binance.getKlines(symbol.toUpperCase(), interval, limit, request.log);
       } catch (err) {
         if (err instanceof InvalidSymbolError) {
           return reply.code(422).send({ detail: err.message });
         }
+        request.log.error({ err, route: 'klines', symbol }, 'upstream failed');
         throw err;
       }
     },

@@ -1,5 +1,8 @@
 import type { FastifyBaseLogger } from 'fastify';
-import type { AgentState } from '../schemas/chat.ts';
+import type { AgentState } from '../../../shared/types/chat.ts';
+import { UpstreamParseError } from './_errors.ts';
+import { fetchWithTimeout } from './_fetch.ts';
+import { AGENT_FETCH_TIMEOUT_MS } from '../constants.ts';
 
 /**
  * HTTP client for the Python LangGraph microservice.
@@ -10,36 +13,43 @@ import type { AgentState } from '../schemas/chat.ts';
  * reviewer) and each one can take a few seconds.
  */
 export class PythonAgentClient {
+  private readonly log: FastifyBaseLogger;
+
   constructor(
     private readonly baseUrl: string,
-    private readonly log: FastifyBaseLogger,
-  ) {}
+    log: FastifyBaseLogger,
+  ) {
+    this.log = log;
+  }
 
-  async runAgent(message: string): Promise<AgentState> {
+  async runAgent(message: string, log?: FastifyBaseLogger): Promise<AgentState> {
+    const logger = log ?? this.log;
     const url = `${this.baseUrl}/run-agent`;
-    this.log.debug({ url, message }, 'pythonAgent: dispatching');
+    logger.debug({ url, message }, 'pythonAgent: dispatching');
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 120_000);
-
-    try {
-      const res = await fetch(url, {
+    const res = await fetchWithTimeout(
+      url,
+      {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ message }),
-        signal: controller.signal,
-      });
+      },
+      AGENT_FETCH_TIMEOUT_MS,
+    );
 
-      if (!res.ok) {
-        const body = await res.text();
-        throw new Error(`Python agent ${res.status}: ${body.slice(0, 200)}`);
-      }
-
-      const state = (await res.json()) as AgentState;
-      this.log.debug({ keys: Object.keys(state) }, 'pythonAgent: state received');
-      return state;
-    } finally {
-      clearTimeout(timeout);
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Python agent ${res.status}: ${body.slice(0, 200)}`);
     }
+
+    let state: AgentState;
+    try {
+      state = (await res.json()) as AgentState;
+    } catch {
+      throw new UpstreamParseError({ url, status: res.status });
+    }
+
+    logger.debug({ keys: Object.keys(state) }, 'pythonAgent: state received');
+    return state;
   }
 }

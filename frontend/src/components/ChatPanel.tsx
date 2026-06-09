@@ -6,21 +6,33 @@ import {
   useRef,
   useState,
 } from "react";
+import type { KeyboardEvent } from "react";
 import ReactMarkdown from "react-markdown";
+import type { ChatRequest, ChatResponse } from "../../../shared/types/chat.ts";
+import type { Kline } from "../../../shared/types/market.ts";
+import { postJson, getJson } from "../api";
+import { extractSymbol } from "../utils/symbols";
 import { CandleChart } from "./CandleChart";
 import "./ChatPanel.css";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
+export interface ChatHandle {
+  injectText: (text: string) => void;
+}
 
-export const ChatPanel = forwardRef(function ChatPanel(
-  { conversationId },
-  ref
-) {
-  const [messages, setMessages] = useState([]);
+interface Message {
+  role: "user" | "assistant";
+  content: string;
+  symbol?: string | null;
+  klines?: Kline[] | null;
+}
+
+export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) {
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const messagesEndRef = useRef(null);
-  const inputRef = useRef(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -30,7 +42,14 @@ export const ChatPanel = forwardRef(function ChatPanel(
     scrollToBottom();
   }, [messages]);
 
-  const appendToInput = useCallback((text) => {
+  // Abort in-flight requests on unmount
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
+
+  const appendToInput = useCallback((text: string) => {
     setInput((prev) => {
       const trimmed = prev.trim();
       return trimmed ? `${trimmed} ${text}` : text;
@@ -39,63 +58,47 @@ export const ChatPanel = forwardRef(function ChatPanel(
   }, []);
 
   useImperativeHandle(ref, () => ({
-    injectText: (text) => appendToInput(text),
-    reset: () => {
-      setMessages([]);
-      setInput("");
-    },
+    injectText: (text: string) => appendToInput(text),
   }));
-
-  const extractSymbol = (text) => {
-    const symbols = [
-      "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
-      "ADAUSDT", "DOGEUSDT", "DOTUSDT", "AVAXUSDT", "MATICUSDT",
-      "LINKUSDT", "UNIUSDT", "ATOMUSDT", "LTCUSDT", "NEARUSDT",
-    ];
-    const upper = text.toUpperCase();
-    for (const s of symbols) {
-      const base = s.replace("USDT", "");
-      if (upper.includes(base)) return s;
-    }
-    return null;
-  };
 
   const sendMessage = async () => {
     const text = input.trim();
     if (!text || loading) return;
 
-    const userMsg = { role: "user", content: text };
+    // Abort any previous in-flight request
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    const userMsg: Message = { role: "user", content: text };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setLoading(true);
 
     try {
-      const res = await fetch(`${API}/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text }),
-      });
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+      const data = await postJson<ChatResponse, ChatRequest>(
+        "/chat",
+        { message: text },
+        { signal: controller.signal }
+      );
 
       const symbol = extractSymbol(text);
-      let klines = null;
+      let klines: Kline[] | null = null;
 
       if (symbol) {
         try {
-          const klinesRes = await fetch(
-            `${API}/klines/${symbol}?interval=4h&limit=42`
+          klines = await getJson<Kline[]>(
+            `/klines/${symbol}?interval=4h&limit=42`,
+            { signal: controller.signal }
           );
-          if (klinesRes.ok) {
-            klines = await klinesRes.json();
-          }
         } catch (e) {
-          console.warn("Failed to fetch klines:", e);
+          if (e instanceof Error && e.name !== "AbortError") {
+            console.warn("Failed to fetch klines:", e);
+          }
         }
       }
 
-      const assistantMsg = {
+      const assistantMsg: Message = {
         role: "assistant",
         content: data.response,
         symbol,
@@ -103,19 +106,21 @@ export const ChatPanel = forwardRef(function ChatPanel(
       };
       setMessages((prev) => [...prev, assistantMsg]);
     } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
+      const message = err instanceof Error ? err.message : "Error desconocido";
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: `Error: ${err.message}` },
+        { role: "assistant", content: `Error: ${message}` },
       ]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      sendMessage();
+      void sendMessage();
     }
   };
 
@@ -124,7 +129,7 @@ export const ChatPanel = forwardRef(function ChatPanel(
       <div className="chat__messages">
         {messages.length === 0 && (
           <div className="chat__empty">
-            <h2>🪙 Crypto Dashboard</h2>
+            <h2>Crypto Dashboard</h2>
             <p>Preguntá sobre cualquier criptomoneda</p>
             <div className="chat__suggestions">
               <button onClick={() => appendToInput("¿Cuál es el precio de BTC?")}>
@@ -151,11 +156,7 @@ export const ChatPanel = forwardRef(function ChatPanel(
                   <ReactMarkdown
                     components={{
                       a: ({ href, children }) => (
-                        <a
-                          href={href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
+                        <a href={href} target="_blank" rel="noopener noreferrer">
                           {children}
                         </a>
                       ),
@@ -163,7 +164,7 @@ export const ChatPanel = forwardRef(function ChatPanel(
                   >
                     {msg.content}
                   </ReactMarkdown>
-                  {msg.klines && msg.klines.length > 0 && (
+                  {msg.klines && msg.klines.length > 0 && msg.symbol && (
                     <CandleChart
                       data={msg.klines}
                       symbol={msg.symbol}
@@ -203,11 +204,13 @@ export const ChatPanel = forwardRef(function ChatPanel(
           placeholder="Preguntá sobre cripto..."
           rows={1}
           disabled={loading}
+          aria-label="Escribí un mensaje"
         />
         <button
           className="chat__send"
-          onClick={sendMessage}
+          onClick={() => void sendMessage()}
           disabled={loading || !input.trim()}
+          aria-label="Enviar mensaje"
         >
           {loading ? "⏳" : "➤"}
         </button>

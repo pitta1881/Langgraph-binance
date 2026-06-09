@@ -4,21 +4,6 @@
   box-sizing: border-box;
 }
 
-:root {
-  --bg-base: #0a0a0f;
-  --bg-surface: #111118;
-  --bg-raised: #16161f;
-  --border: #1e1e30;
-  --border-muted: #16161f;
-  --text-primary: #e0e0e0;
-  --text-secondary: #a0a0b0;
-  --text-muted: #60607a;
-  --accent: #3d6fa8;
-  --accent-hover: #4a7fc0;
-  --green: #00c853;
-  --red: #ff1744;
-}
-
 body {
   background: var(--bg-base);
   color: var(--text-primary);
@@ -38,6 +23,7 @@ body {
   overflow: hidden;
 }
 
+/* ── Sidebar ──────────────────────────────────────────────── */
 .app__sidebar {
   width: 300px;
   min-width: 260px;
@@ -47,18 +33,9 @@ body {
   padding: 10px;
   overflow-y: auto;
   border-right: 1px solid var(--border);
-  background: #0c0c13;
+  background: var(--bg-base);
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
-}
-
-.app__sidebar::-webkit-scrollbar {
-  width: 4px;
-}
-
-.app__sidebar::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 2px;
 }
 
 .app__main {
@@ -68,8 +45,68 @@ body {
   overflow: hidden;
 }
 
+/* ── Hamburger (mobile only) ──────────────────────────────── */
+.hamburger {
+  display: none;
+  position: fixed;
+  top: 46px;
+  left: 8px;
+  z-index: 200;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  width: 34px;
+  height: 34px;
+  cursor: pointer;
+  font-size: 1.1rem;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.hamburger:hover {
+  background: var(--bg-surface);
+}
+
+.hamburger:focus-visible {
+  outline: 2px solid #4fc3f7;
+  outline-offset: 2px;
+}
+
+/* ── Mobile drawer ────────────────────────────────────────── */
 @media (max-width: 768px) {
+  .hamburger {
+    display: flex;
+  }
+
   .app__sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    z-index: 300;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    border-right: 1px solid var(--border-soft);
+    background: var(--bg-base);
+  }
+
+  .app__sidebar--open {
+    transform: translateX(0);
+  }
+
+  .drawer-backdrop {
     display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 299;
+    backdrop-filter: blur(2px);
+  }
+
+  .drawer-backdrop--visible {
+    display: block;
   }
 }

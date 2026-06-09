@@ -11,8 +11,7 @@ export const healthRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
         },
       },
     },
-    async (request) => {
-      request.log.debug('health check');
+    async () => {
       return { status: 'ok' as const };
     },
   );

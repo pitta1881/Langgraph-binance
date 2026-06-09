@@ -1,7 +1,5 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { Type } from '@sinclair/typebox';
-
-import { CoingeckoClient } from '../clients/coingecko.ts';
 import { TrendingCoinSchema } from '../schemas/market.ts';
 
 export const trendingRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
@@ -13,12 +11,12 @@ export const trendingRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
     async (request) => {
-      const client = new CoingeckoClient(
-        fastify.config.COINGECKO_BASE_URL,
-        fastify.config.COINGECKO_API_KEY,
-        request.log,
-      );
-      return client.getTrending();
+      try {
+        return await fastify.coingecko.getTrending(request.log);
+      } catch (err) {
+        request.log.error({ err, route: 'trending' }, 'upstream failed');
+        throw err;
+      }
     },
   );
 };
