@@ -1,6 +1,10 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import Fastify from 'fastify';
 import fastifyEnv from '@fastify/env';
 import fastifyCors from '@fastify/cors';
+import fastifyStatic from '@fastify/static';
 import {
   type TypeBoxTypeProvider,
   TypeBoxValidatorCompiler,
@@ -75,6 +79,21 @@ async function buildServer() {
   await fastify.register(klinesRoutes);
   await fastify.register(trendingRoutes);
   await fastify.register(chatRoutes);
+
+  if (!isDev) {
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const staticRoot = path.join(__dirname, '..', 'public');
+
+    await fastify.register(fastifyStatic, {
+      root: staticRoot,
+      prefix: '/',
+      wildcard: false,
+    });
+
+    fastify.setNotFoundHandler(async (_request, reply) => {
+      return reply.sendFile('index.html', staticRoot);
+    });
+  }
 
   return fastify;
 }

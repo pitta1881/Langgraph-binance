@@ -1,0 +1,13 @@
+node_modules
+.env
+.env.*
+!.env.example
+*.log
+.git
+.claude
+__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+artifacts/
+frontend/dist
