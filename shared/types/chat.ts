@@ -12,7 +12,8 @@ export type AgentIntent =
   | 'analysis'
   | 'market_overview'
   | 'coin_info'
-  | 'no_symbol';
+  | 'no_symbol'
+  | 'off_topic';
 
 /**
  * One compact entry in the rolling conversation history.
