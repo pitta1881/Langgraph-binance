@@ -12,6 +12,7 @@ from .nodes import (
     intent_router,
     market_scout,
     no_symbol_response,
+    off_topic_response,
     price_fetcher,
     price_only,
     reviewer,
@@ -33,6 +34,7 @@ def build_chat_graph() -> StateGraph:
     builder.add_node("price_only", price_only)
     builder.add_node("market_scout", market_scout)
     builder.add_node("no_symbol", no_symbol_response)
+    builder.add_node("off_topic", off_topic_response)
     builder.add_node("coin_info", coin_info_responder)
 
     builder.set_entry_point("intent_router")
@@ -44,6 +46,7 @@ def build_chat_graph() -> StateGraph:
             "price_fetcher": "price_fetcher",
             "market_scout": "market_scout",
             "no_symbol": "no_symbol",
+            "off_topic": "off_topic",
             "coin_info": "coin_info",
         },
     )
@@ -65,6 +68,7 @@ def build_chat_graph() -> StateGraph:
     builder.add_edge("price_only", END)
     builder.add_edge("market_scout", END)
     builder.add_edge("no_symbol", END)
+    builder.add_edge("off_topic", END)
     builder.add_edge("coin_info", END)
 
     return builder.compile()
