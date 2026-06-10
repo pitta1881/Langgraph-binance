@@ -1,9 +1,0 @@
-INFO:     Will watch for changes in these directories: ['F:\\UNLu\\2026\\IA\\TP Jueves']
-22:16:13 | INFO    | backend.api.main | Crypto Dashboard API started
-INFO:     Uvicorn running on http://0.0.0.0:8002 (Press CTRL+C to quit)
-INFO:     Started reloader process [32588] using WatchFiles
-22:16:15 | INFO    | backend.api.main | Crypto Dashboard API started
-INFO:     Started server process [544]
-INFO:     Waiting for application startup.
-INFO:     Application startup complete.
-22:16:17 | DEBUG   | backend.api.routes | health check called

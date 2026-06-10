@@ -8,9 +8,6 @@ _ENV_FILE = Path(__file__).parent / ".env"
 
 
 class Settings(BaseSettings):
-    BINANCE_API_KEY: str = ""
-    BINANCE_API_SECRET: str = ""
-    BINANCE_TESTNET: bool = False
     AI_API_KEY: str = ""
     AI_MODEL: str = "gemini-2.0-flash"
     LOG_LEVEL: str = "INFO"
