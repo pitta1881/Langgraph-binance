@@ -74,7 +74,70 @@ Settings are loaded via pydantic-settings in `agent_service/settings.py` and `@f
 
 ## Architecture
 
-### Request flow
+### System diagram
+
+```mermaid
+flowchart LR
+    subgraph User["User"]
+        Browser[("Browser")]
+    end
+
+    subgraph FE["frontend/ — React 19 + Vite :5173"]
+        ChatPanel["ChatPanel.tsx<br/>messages + history"]
+        Sidebar["Heatmap / TrendingPanel<br/>TickerBanner / CandleChart"]
+        Hooks["useFetch / usePolling<br/>(AbortController)"]
+    end
+
+    subgraph GW["backend-node/ — Fastify :8000 (TypeScript)"]
+        Routes["routes/<br/>health · heatmap · ticker/banner<br/>klines · trending · chat"]
+        Plugins["plugins/<br/>binance · coingecko · pythonAgent<br/>swagger"]
+        Schemas["schemas/<br/>TypeBox + shared/types"]
+        Routes -- "fastify.decorate" --> Plugins
+        Routes -. "TypeBox validation" .-> Schemas
+    end
+
+    subgraph AG["agent_service/ — FastAPI :8001 (Python)"]
+        RunAgent["/run-agent<br/>(message, history?)"]
+        LangGraph["LangGraph StateGraph"]
+        BinPy["binance/real_client.py<br/>(prices, klines)"]
+        GeckoPy["coingecko.py<br/>(dynamic id resolution)"]
+        Artifact["artifacts/graph.png<br/>refreshed on startup"]
+
+        RunAgent --> LangGraph
+        LangGraph --> BinPy
+        LangGraph --> GeckoPy
+        RunAgent -.- Artifact
+    end
+
+    subgraph EXT["External APIs"]
+        Binance[("Binance<br/>api.binance.com")]
+        CoinGecko[("CoinGecko<br/>api.coingecko.com")]
+        Gemini[("Google Gemini<br/>generativelanguage")]
+    end
+
+    Browser -- "HTTP/JSON" --> ChatPanel
+    Browser -- "HTTP/JSON" --> Sidebar
+    ChatPanel -. "uses" .-> Hooks
+    Sidebar  -. "uses" .-> Hooks
+
+    Hooks -- "POST /chat<br/>{message, history}" --> Routes
+    Hooks -- "GET /heatmap · /ticker/banner<br/>/klines/:sym · /trending" --> Routes
+
+    Plugins -- "GET /ticker/24hr<br/>GET /klines" --> Binance
+    Plugins -- "GET /search/trending" --> CoinGecko
+    Plugins -- "POST /run-agent" --> RunAgent
+
+    BinPy   -- "prices · klines" --> Binance
+    GeckoPy -- "GET /search?query=<br/>GET /coins/{id}" --> CoinGecko
+    LangGraph -- "ChatGoogleGenerativeAI" --> Gemini
+
+    Routes -- "{response, intent, symbol}" --> Hooks
+
+    classDef ext fill:#1a3a5c,stroke:#88c,color:#fff
+    class Binance,CoinGecko,Gemini ext
+```
+
+### Request flow (compact)
 
 ```
 Frontend (Vite :5173)
@@ -83,6 +146,7 @@ Frontend (Vite :5173)
             ├─► CoinGecko API         (trending)
             └─► Agent Service (:8001) (chat → POST /run-agent)
                     └─► LangGraph + Gemini
+                          └─► Binance + CoinGecko (per-node enrichment)
 ```
 
 ### Gateway (`backend-node/`)
@@ -105,6 +169,7 @@ Frontend (Vite :5173)
 - **`agents/chat/graph.py`** — LangGraph `StateGraph` definition.
 - **`agents/chat/nodes.py`** — async node functions updating `ChatState`. Uses `binance/` and `coingecko.py` internally (price_fetcher, market_scout, coin_info nodes). `intent_router` is the only node that consumes `state["history"]` for symbol carryover.
 - **`agents/shared/state.py`** — `ChatState` TypedDict; includes `history: list[ConversationTurn]` for conversation memory.
+- **`coingecko.py`** — CoinGecko client used by the `coin_info` node. Resolves `Binance symbol → CoinGecko id` dynamically via `GET /api/v3/search` (no hardcoded mapping). Two in-memory caches: `_id_cache` (24h for resolution hits, 10 min for misses) and `_info_cache` (1h for the rendered info block). Network errors bypass the cache so a retry can succeed. Pick rule: prefer an exact case-insensitive symbol match in the search results; fall back to `coins[0]` (CoinGecko already ranks by market cap).
 
 LangGraph flow:
 ```
