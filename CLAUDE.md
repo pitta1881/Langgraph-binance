@@ -109,7 +109,8 @@ LangGraph flow:
 ```
 intent_router
 ├─► market_scout → END             (market_overview intent)
-├─► no_symbol → END                (coin not identified)
+├─► no_symbol → END                (crypto question, coin not identified)
+├─► off_topic → END                (question is not about crypto at all)
 ├─► coin_info → END                (fundamentals via CoinGecko)
 └─► price_fetcher → data_validator
         ├─► price_only → END       (price_only intent or bad data)
@@ -117,6 +118,11 @@ intent_router
 ```
 
 `reviewer` synthesizes the three specialist analyses into a final Spanish-language report with BUY/SELL/HOLD recommendation and a Binance trading link. Every node has try/except with a degraded fallback response.
+
+`off_topic` and `no_symbol` are deliberately distinct terminal nodes with different copy:
+- `no_symbol` ("No identifiqué ninguna criptomoneda… opciones: BTC, ETH…") assumes the user asked about crypto but the symbol was ambiguous.
+- `off_topic` ("Soy un asistente especializado en criptomonedas…") assumes the question is outside scope (weather, greetings, politics).
+Mixing them confuses users — see the "Conversation memory" section below for why this distinction is load-bearing.
 
 ### Contract between Gateway and Agent
 
@@ -131,14 +137,21 @@ The chat is **client-side stateful**. The frontend (`ChatPanel.tsx`) keeps its `
 - User turns send `{role: 'user', content: <text>}`.
 - Assistant turns send only `{role: 'assistant', symbol, intent}` — the long reviewer text is NOT sent. The router only needs the symbol to resolve implicit references.
 
-Only the `intent_router` node consumes `state["history"]`. It does two things:
+Only the `intent_router` node consumes `state["history"]`. The carryover is **delegated to the LLM**, not done blindly in Python:
 
-1. Renders the history as a Spanish context block in the system prompt so Gemini can resolve pronouns and elisions.
-2. If neither the pattern matcher nor the LLM produced a symbol for the current turn, `_last_symbol_from_history()` runs as a final fallback and carries over the most recent assistant symbol. This is what makes "es buen momento para comprar?" resolve to SOL after the user previously asked "¿qué es SOL?".
+1. The history is rendered as a Spanish context block inside the SystemMessage.
+2. The prompt teaches the LLM the carryover rules with explicit examples:
+   - Explicit symbol in current message → always wins over context.
+   - Implicit crypto reference ("comprar?", "subió?") → carry over the last assistant symbol.
+   - Off-topic question (weather, greetings, code help) → return `intent='off_topic'`, `symbol=null`. **Never** carry over.
+3. Defensive Python normalization runs after: `intent='off_topic'` forces `symbol=None`, and `intent in {price_only, analysis, coin_info}` without a symbol downgrades to `no_symbol`.
+4. `_last_symbol_from_history()` survives only in the `except` path. If the LLM call or JSON parse fails, we fall back to `analysis` with the previous symbol (better than dropping the user's context).
+
+**Why this design**: an earlier version did the carryover in Python regardless of intent. After "deberia vender Tron?" → "cómo está el clima en Miami?" it replayed a TRX analysis because Python had no way to know the new question wasn't crypto. The LLM does — it just needs explicit instructions.
 
 History is capped at 20 turns (`MAX_HISTORY_TURNS` in `ChatPanel.tsx`). Refreshing the browser resets the conversation — there is no server-side store.
 
-The shared shapes live at `shared/types/chat.ts` (`ConversationTurn`, extended `ChatRequest`/`ChatResponse`). Both the gateway TypeBox schemas and the frontend hooks reference them.
+The shared shapes live at `shared/types/chat.ts` (`ConversationTurn`, extended `ChatRequest`/`ChatResponse`, `AgentIntent` union including `'off_topic'`). Both the gateway TypeBox schemas and the frontend hooks reference them.
 
 ### Frontend
 
