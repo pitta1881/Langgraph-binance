@@ -47,7 +47,7 @@ cd frontend && npm install
 
 **Generate agent graph visualization:**
 ```bash
-python scripts/gen_graph.py
+python agent_service/scripts/gen_graph.py
 ```
 
 ## Environment
@@ -69,6 +69,8 @@ AI_MODEL=gemini-2.0-flash
 LOG_LEVEL=DEBUG
 PYTHONUNBUFFERED=1        # critical on Windows for live log streaming
 ```
+
+Copy from `agent_service/.env.example` and `backend-node/.env.example`.
 
 Settings are loaded via pydantic-settings in `agent_service/settings.py` and `@fastify/env` in `backend-node/src/config.ts`.
 
@@ -224,7 +226,7 @@ Only the `intent_router` node consumes `state["history"]`. The carryover is **de
 
 **Why this design**: an earlier version did the carryover in Python regardless of intent. After "deberia vender Tron?" → "cómo está el clima en Miami?" it replayed a TRX analysis because Python had no way to know the new question wasn't crypto. The LLM does — it just needs explicit instructions.
 
-History is capped at 20 turns (`MAX_HISTORY_TURNS` in `ChatPanel.tsx`). Refreshing the browser resets the conversation — there is no server-side store.
+History is capped at 10 turns (`MAX_HISTORY_TURNS` in `ChatPanel.tsx`). Refreshing the browser or clicking the ↺ button in the context bar resets the conversation — there is no server-side store. The context bar shows a progress indicator (`N/MAX contexto`) between the message list and the input area. It only renders when there are messages. The bar color shifts from blue (`--accent`) through orange (`#ff9800`) to red (`--red`) as the context window fills up (thresholds at 70% and 90%).
 
 The shared shapes live at `shared/types/chat.ts` (`ConversationTurn`, extended `ChatRequest`/`ChatResponse`, `AgentIntent` union including `'off_topic'`). Both the gateway TypeBox schemas and the frontend hooks reference them.
 

@@ -11,7 +11,7 @@ import ReactMarkdown from "react-markdown";
 import type { ChatRequest, ChatResponse, ConversationTurn } from "../../../shared/types/chat.ts";
 import type { Kline } from "../../../shared/types/market.ts";
 
-const MAX_HISTORY_TURNS = 20;
+const MAX_HISTORY_TURNS = 10;
 import { postJson, getJson } from "../api";
 import { extractSymbol } from "../utils/symbols";
 import { CandleChart } from "./CandleChart";
@@ -46,6 +46,12 @@ function buildHistory(messages: Message[]): ConversationTurn[] {
           intent: m.intent,
         },
   );
+}
+
+function getContextColor(ratio: number): string {
+  if (ratio > 0.9) return "var(--red)";
+  if (ratio > 0.7) return "#ff9800";
+  return "var(--accent)";
 }
 
 export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) {
@@ -219,6 +225,31 @@ export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) 
 
         <div ref={messagesEndRef} />
       </div>
+
+      {messages.length > 0 && (
+        <div className="chat__context-bar">
+          <div className="chat__context-track">
+            <div
+              className="chat__context-fill"
+              style={{
+                width: `${(Math.min(messages.length, MAX_HISTORY_TURNS) / MAX_HISTORY_TURNS) * 100}%`,
+                backgroundColor: getContextColor(Math.min(messages.length, MAX_HISTORY_TURNS) / MAX_HISTORY_TURNS),
+              }}
+            />
+          </div>
+          <span className="chat__context-label">
+            {Math.min(messages.length, MAX_HISTORY_TURNS)}/{MAX_HISTORY_TURNS} contexto
+          </span>
+          <button
+            className="chat__reset"
+            onClick={() => setMessages([])}
+            aria-label="Nueva conversación"
+            title="Nueva conversación"
+          >
+            ↺
+          </button>
+        </div>
+      )}
 
       <div className="chat__input-area">
         <textarea

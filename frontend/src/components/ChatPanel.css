@@ -146,6 +146,60 @@
   }
 }
 
+/* Context bar */
+.chat__context-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 16px;
+  border-top: 1px solid #1a1a2a;
+  background: var(--bg-input);
+}
+
+.chat__context-track {
+  flex: 1;
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.chat__context-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.chat__context-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.chat__reset {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  padding: 1px 6px;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.chat__reset:hover {
+  color: var(--text-primary);
+  border-color: var(--border-soft);
+}
+
+.chat__reset:focus-visible {
+  outline: 2px solid #4fc3f7;
+  outline-offset: 2px;
+}
+
 /* Input area */
 .chat__input-area {
   display: flex;
