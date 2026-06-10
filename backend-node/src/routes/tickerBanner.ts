@@ -9,6 +9,11 @@ export const tickerBannerRoutes: FastifyPluginAsyncTypebox = async (fastify) => 
     '/ticker/banner',
     {
       schema: {
+        tags: ['Market'],
+        summary: 'Top 10 USDT pairs for the scrolling banner',
+        description:
+          'Same source as /heatmap but trimmed to the top 10 and stripped of the volume field. '
+          + 'Polled every 15s by the frontend.',
         response: { 200: Type.Array(TickerSchema) },
       },
     },

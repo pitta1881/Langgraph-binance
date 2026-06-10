@@ -8,6 +8,11 @@ export const klinesRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
     '/klines/:symbol',
     {
       schema: {
+        tags: ['Market'],
+        summary: 'Candlestick history for a symbol',
+        description:
+          'Proxies Binance /api/v3/klines. The `interval` query param is a constrained union '
+          + '(1m, 5m, 1h, 4h, 1d, etc); invalid values get a 400. Unknown symbols get 422.',
         params: SymbolParamSchema,
         querystring: KlinesQuerySchema,
         response: {

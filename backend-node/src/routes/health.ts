@@ -6,6 +6,9 @@ export const healthRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
     '/health',
     {
       schema: {
+        tags: ['System'],
+        summary: 'Health check',
+        description: 'Returns 200 with a static OK payload. Used by orchestrators and uptime probes.',
         response: {
           200: Type.Object({ status: Type.Literal('ok') }),
         },

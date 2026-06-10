@@ -96,7 +96,8 @@ Frontend (Vite :5173)
 - **`src/utils/parseNum.ts`** — strict `Number()` replacement that throws on NaN.
 - **`src/utils/market.ts`** — `topByVolume` used by `heatmap` and `tickerBanner` routes.
 - **`src/schemas/`** — TypeBox schemas. `market.ts` defines `Ticker`/`Kline`/`TrendingCoin` shapes (validated runtime) plus assignability checks against the shared interfaces. `chat.ts` defines `ChatRequest` (with optional `history`) / `ChatResponse` (with optional `intent`, `symbol`).
-- **`src/routes/`** — one file per endpoint. All use `FastifyPluginAsyncTypebox` so request/response are typed and validated. `klines` interval is a TypeBox literal union so invalid values get a 400 with a clear message (not a fake "Invalid symbol").
+- **`src/routes/`** — one file per endpoint. All use `FastifyPluginAsyncTypebox` so request/response are typed and validated. `klines` interval is a TypeBox literal union so invalid values get a 400 with a clear message (not a fake "Invalid symbol"). Each route's `schema` carries `tags`/`summary`/`description` for Swagger.
+- **`src/plugins/swagger.ts`** — registers `@fastify/swagger` + `@fastify/swagger-ui` ONLY when `NODE_ENV !== 'production'`. UI at `/docs`, raw OpenAPI 3 spec at `/docs/json`. The spec is generated automatically from each route's TypeBox schema — no parallel YAML to maintain.
 
 ### Agent Service (`agent_service/`)
 
@@ -123,6 +124,15 @@ intent_router
 - `no_symbol` ("No identifiqué ninguna criptomoneda… opciones: BTC, ETH…") assumes the user asked about crypto but the symbol was ambiguous.
 - `off_topic` ("Soy un asistente especializado en criptomonedas…") assumes the question is outside scope (weather, greetings, politics).
 Mixing them confuses users — see the "Conversation memory" section below for why this distinction is load-bearing.
+
+### API documentation
+
+In dev (`NODE_ENV !== 'production'`):
+
+- **Interactive UI**: <http://localhost:8000/docs> — Swagger UI with the 6 endpoints grouped under `Market`, `Chat`, `System` tags. "Try it out" works against the live gateway.
+- **Raw OpenAPI 3 spec**: <http://localhost:8000/docs/json> — useful for client SDK generation or piping into Postman/Insomnia.
+
+In production both endpoints return 404 (plugin not registered). Re-enable by setting `NODE_ENV` to anything other than `production`.
 
 ### Contract between Gateway and Agent
 

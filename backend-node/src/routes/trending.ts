@@ -7,6 +7,10 @@ export const trendingRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
     '/trending',
     {
       schema: {
+        tags: ['Market'],
+        summary: 'Trending coins from CoinGecko',
+        description:
+          'Top trending coins from CoinGecko /search/trending. Used by the sidebar TrendingPanel.',
         response: { 200: Type.Array(TrendingCoinSchema) },
       },
     },

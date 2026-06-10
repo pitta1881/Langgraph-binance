@@ -9,6 +9,11 @@ export const heatmapRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
     '/heatmap',
     {
       schema: {
+        tags: ['Market'],
+        summary: 'Top 20 USDT pairs by 24h volume',
+        description:
+          'Aggregates Binance 24h ticker data, filters to *USDT pairs, sorts by quote volume, '
+          + 'and returns the top 20. Used to render the dashboard heatmap.',
         response: { 200: Type.Array(TickerSchema) },
       },
     },

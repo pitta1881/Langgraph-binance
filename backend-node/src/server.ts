@@ -10,6 +10,7 @@ import { ConfigSchema } from './config.ts';
 import { binanceClientPlugin } from './plugins/binance.ts';
 import { coingeckoClientPlugin } from './plugins/coingecko.ts';
 import { pythonAgentClientPlugin } from './plugins/pythonAgent.ts';
+import { swaggerPlugin } from './plugins/swagger.ts';
 import { chatRoutes } from './routes/chat.ts';
 import { healthRoutes } from './routes/health.ts';
 import { heatmapRoutes } from './routes/heatmap.ts';
@@ -63,6 +64,10 @@ async function buildServer() {
     origin: true,
     credentials: true,
   });
+
+  // Swagger MUST be registered before any route — it hooks into route
+  // registration to capture schemas and build the OpenAPI document.
+  await fastify.register(swaggerPlugin);
 
   await fastify.register(healthRoutes);
   await fastify.register(heatmapRoutes);

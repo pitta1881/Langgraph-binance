@@ -7,6 +7,12 @@ export const chatRoutes: FastifyPluginAsyncTypebox = async (fastify) => {
     '/chat',
     {
       schema: {
+        tags: ['Chat'],
+        summary: 'Forward a message to the LangGraph agent',
+        description:
+          'Proxies the user message (and an optional conversation history of up to 20 turns) to '
+          + 'the Python agent service. Returns the final response plus the resolved intent and '
+          + 'symbol so the frontend can reconstruct compact history for the next turn.',
         body: ChatRequestSchema,
         response: {
           200: ChatResponseSchema,
