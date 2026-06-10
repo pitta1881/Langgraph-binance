@@ -8,41 +8,97 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-SYMBOL_TO_GECKO_ID: dict[str, str] = {
-    "BTCUSDT": "bitcoin",
-    "ETHUSDT": "ethereum",
-    "BNBUSDT": "binancecoin",
-    "SOLUSDT": "solana",
-    "XRPUSDT": "ripple",
-    "ADAUSDT": "cardano",
-    "DOGEUSDT": "dogecoin",
-    "DOTUSDT": "polkadot",
-    "AVAXUSDT": "avalanche-2",
-    "MATICUSDT": "matic-network",
-    "LINKUSDT": "chainlink",
-    "UNIUSDT": "uniswap",
-    "ATOMUSDT": "cosmos",
-    "LTCUSDT": "litecoin",
-    "NEARUSDT": "near",
-}
+# ---------------------------------------------------------------------------
+# In-memory caches
+# ---------------------------------------------------------------------------
+#
+# `_id_cache`   maps a Binance-style symbol ("SHIBUSDT") to the resolved
+#               CoinGecko id ("shiba-inu") OR `None` when /search returned
+#               nothing. Caching the miss avoids hammering CoinGecko when the
+#               user keeps asking about something it doesn't know about.
+#
+# `_info_cache` maps the resolved CoinGecko id to the formatted info string.
+#               The id is the natural cache key because the same coin can be
+#               reached through multiple symbol aliases.
+#
 
-_cache: dict[str, tuple[float, str]] = {}
-_CACHE_TTL = 3600  # 1 hour
+_id_cache: dict[str, tuple[float, str | None]] = {}
+_info_cache: dict[str, tuple[float, str]] = {}
+
+_INFO_TTL = 3600      # 1 hour for the rendered info block
+_ID_HIT_TTL = 86400   # 24 hours for resolved ids (gecko ids are stable)
+_ID_MISS_TTL = 600    # 10 minutes for resolution misses (transient typos)
+
+_GECKO_BASE = "https://api.coingecko.com/api/v3"
+
+
+async def _resolve_gecko_id(symbol: str) -> str | None:
+    """Resolve a Binance-style symbol to a CoinGecko coin id.
+
+    Always goes through CoinGecko `/search` rather than a hardcoded mapping,
+    so any coin CoinGecko indexes is reachable. Results are cached so each
+    symbol incurs at most one /search call (per hit TTL).
+
+    Returns the coin id, or `None` when CoinGecko has no record. The `None`
+    is itself cached (with a shorter TTL) so we don't spam CoinGecko on the
+    same miss. Network errors bypass the cache so a retry can succeed later.
+    """
+    now = time.time()
+    cached = _id_cache.get(symbol)
+    if cached is not None:
+        ts, value = cached
+        ttl = _ID_HIT_TTL if value is not None else _ID_MISS_TTL
+        if now - ts < ttl:
+            return value
+
+    base = symbol.replace("USDT", "")
+    url = f"{_GECKO_BASE}/search"
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(url, params={"query": base})
+            resp.raise_for_status()
+            data = resp.json()
+    except Exception as exc:
+        logger.warning("CoinGecko /search failed for %s: %s", base, exc)
+        return None  # transient — do NOT cache so the next turn retries
+
+    coins = data.get("coins") or []
+    base_upper = base.upper()
+    # Prefer an exact symbol match (case-insensitive); fall back to the first
+    # result, which CoinGecko already ranks by market cap relevance.
+    chosen: str | None = None
+    for item in coins:
+        if (item.get("symbol") or "").upper() == base_upper:
+            chosen = item.get("id")
+            break
+    if chosen is None and coins:
+        chosen = coins[0].get("id")
+
+    logger.debug("coingecko: searching for %r -> %s", base, chosen)
+    _id_cache[symbol] = (now, chosen)
+    return chosen
 
 
 async def get_coin_info(symbol: str) -> str | None:
-    gecko_id = SYMBOL_TO_GECKO_ID.get(symbol)
+    """Return a formatted info block for `symbol`, or `None` if unknown.
+
+    Resolution is two-stage:
+      1. symbol -> gecko_id via `_resolve_gecko_id` (with cache).
+      2. gecko_id -> formatted info via `/coins/{id}` (with cache).
+    """
+    gecko_id = await _resolve_gecko_id(symbol)
     if not gecko_id:
         return None
 
     now = time.time()
-    if gecko_id in _cache:
-        ts, data = _cache[gecko_id]
-        if now - ts < _CACHE_TTL:
-            return data
+    cached = _info_cache.get(gecko_id)
+    if cached is not None:
+        ts, payload = cached
+        if now - ts < _INFO_TTL:
+            return payload
 
     try:
-        url = f"https://api.coingecko.com/api/v3/coins/{gecko_id}"
+        url = f"{_GECKO_BASE}/coins/{gecko_id}"
         params = {
             "localization": "false",
             "tickers": "false",
@@ -56,7 +112,7 @@ async def get_coin_info(symbol: str) -> str | None:
             resp.raise_for_status()
             data = resp.json()
         formatted = _format_coin_info(data)
-        _cache[gecko_id] = (now, formatted)
+        _info_cache[gecko_id] = (now, formatted)
         return formatted
     except Exception as exc:
         logger.warning("CoinGecko fetch failed for %s: %s", gecko_id, exc)
