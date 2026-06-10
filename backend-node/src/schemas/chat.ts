@@ -18,7 +18,7 @@ void _turnCheck;
 
 export const ChatRequestSchema = Type.Object({
   message: Type.String({ minLength: 1 }),
-  history: Type.Optional(Type.Array(ConversationTurnSchema, { maxItems: 20 })),
+  history: Type.Optional(Type.Array(ConversationTurnSchema, { maxItems: 10 })),
 });
 export type ChatRequest = Static<typeof ChatRequestSchema>;
 const _chatRequestCheck: SharedChatRequest = {} as ChatRequest;

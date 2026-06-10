@@ -146,7 +146,7 @@ def _last_symbol_from_history(history: list[dict] | None) -> str | None:
     return None
 
 
-def _format_history_for_router(history: list[dict] | None, max_turns: int = 20) -> str:
+def _format_history_for_router(history: list[dict] | None, max_turns: int = 10) -> str:
     """Render the last N turns as a compact context block for the LLM.
 
     Keeps each entry to a single line. Only the symbol/intent matter for

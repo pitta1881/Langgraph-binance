@@ -21,7 +21,7 @@ export type AgentIntent =
  * For `role: 'user'` we send the raw text in `content`. For `role: 'assistant'`
  * we omit `content` and only send what the intent_router actually needs to
  * resolve implicit references: the symbol and the intent of the previous turn.
- * This keeps the prompt cheap (under a few KB even with 20 turns).
+ * This keeps the prompt cheap (under a few KB even with 10 turns).
  */
 export interface ConversationTurn {
   role: 'user' | 'assistant';
@@ -32,7 +32,7 @@ export interface ConversationTurn {
 
 export interface ChatRequest {
   message: string;
-  /** Oldest first. Up to 20 entries. Omit on first turn. */
+  /** Oldest first. Up to 10 entries. Omit on first turn. */
   history?: ConversationTurn[];
 }
 
