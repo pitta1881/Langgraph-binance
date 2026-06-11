@@ -33,9 +33,11 @@ void _klineCheck;
 export const TrendingCoinSchema = Type.Object({
   name: Type.String(),
   symbol: Type.String(),
+  coingecko_id: Type.String(),
   market_cap_rank: Type.Union([Type.Number(), Type.Null()]),
   thumb: Type.String(),
   price_btc: Type.Number(),
+  price_usd: Type.Number(),
 });
 export type TrendingCoin = Static<typeof TrendingCoinSchema>;
 const _trendingCoinCheck: SharedTrendingCoin = {} as TrendingCoin;

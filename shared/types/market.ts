@@ -28,9 +28,11 @@ export interface Kline {
 export interface TrendingCoin {
   name: string;
   symbol: string;
+  coingecko_id: string;
   market_cap_rank: number | null;
   thumb: string;
   price_btc: number;
+  price_usd: number;
 }
 
 /** Valid Binance kline intervals, kept narrow so the gateway can validate. */

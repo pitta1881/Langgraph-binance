@@ -50,3 +50,39 @@
   margin-top: 2px;
   font-variant-numeric: tabular-nums;
 }
+
+.heatmap__tooltip {
+  position: fixed;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  pointer-events: none;
+  z-index: 100;
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.heatmap__tooltip-symbol {
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+}
+
+.heatmap__tooltip-price {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.heatmap__tooltip-change {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.72rem;
+}
+
+.heatmap__tooltip-change.pos { color: var(--heatmap-green-mid); }
+.heatmap__tooltip-change.neg { color: var(--heatmap-red-mid); }

@@ -14,11 +14,13 @@ import { parseNum } from '../utils/parseNum.ts';
  */
 
 interface TrendingCoinItem {
+  id: string;
   name: string;
   symbol: string;
   market_cap_rank: number | null;
   thumb?: string;
   price_btc?: number | string;
+  data?: { price?: number | string };
 }
 
 export class CoingeckoClient {
@@ -55,7 +57,9 @@ export class CoingeckoClient {
       symbol: item.symbol,
       market_cap_rank: item.market_cap_rank ?? null,
       thumb: item.thumb ?? '',
+      coingecko_id: item.id,
       price_btc: parseNum(item.price_btc ?? 0, 'price_btc', url),
+      price_usd: parseNum(item.data?.price ?? 0, 'price_usd', url),
     }));
     logger.debug({ count: coins.length }, 'coingecko: trending parsed');
     return coins;
