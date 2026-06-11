@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import "./CoinMenu.css";
 
 export interface CoinMenuCoin {
   ticker: string;
@@ -33,7 +32,6 @@ export function CoinMenu({ coin, position, onClose }: Props) {
     };
   }, [onClose]);
 
-  // Adjust position so menu doesn't overflow viewport
   const style: React.CSSProperties = {
     left: Math.min(position.x, window.innerWidth - 192),
     top: Math.min(position.y, window.innerHeight - 160),
@@ -54,21 +52,32 @@ export function CoinMenu({ coin, position, onClose }: Props) {
 
   const formatPrice = (price: number | null) => {
     if (price === null) return "–";
-    if (price >= 1) return `$${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (price >= 1)
+      return `$${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     return `$${price.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 8 })}`;
   };
 
+  const itemClass =
+    "block w-full px-3 py-2 cursor-pointer text-[0.83rem] text-text-primary text-left bg-transparent border-0 font-[inherit] no-underline box-border hover:bg-bg-surface";
+
   return (
-    <div ref={ref} className="coin-menu" style={style} role="menu">
-      <div className="coin-menu__price">
-        <span className="coin-menu__ticker">{baseTicker}</span>
+    <div
+      ref={ref}
+      className="fixed bg-bg-raised border border-border rounded-md min-w-[180px] z-[200] overflow-hidden shadow-[0_4px_16px_rgba(0,0,0,0.45)]"
+      style={style}
+      role="menu"
+    >
+      <div className="flex justify-between items-center px-3 pt-2 pb-1.5 text-text-muted text-[0.8rem] cursor-default border-b border-border-soft gap-3">
+        <span className="font-bold text-text-secondary text-[0.75rem] tracking-[0.04em]">
+          {baseTicker}
+        </span>
         <span>{formatPrice(coin.price)}</span>
       </div>
-      <button className="coin-menu__item" onClick={handleCopy} role="menuitem">
+      <button className={itemClass} onClick={handleCopy} role="menuitem">
         {copied ? "✓ Copiado" : "Copiar ticker"}
       </button>
       <a
-        className="coin-menu__item"
+        className={itemClass}
         href={binanceUrl}
         target="_blank"
         rel="noopener noreferrer"
@@ -77,7 +86,7 @@ export function CoinMenu({ coin, position, onClose }: Props) {
         Abrir en Binance ↗
       </a>
       <a
-        className="coin-menu__item"
+        className={itemClass}
         href={coingeckoUrl}
         target="_blank"
         rel="noopener noreferrer"

@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import type { Ticker } from "../../../shared/types/market.ts";
 import { usePolling } from "../hooks/usePolling";
-import "./TickerBanner.css";
 
 function formatPrice(price: number): string {
   if (price >= 1000)
@@ -14,6 +13,8 @@ function formatPrice(price: number): string {
   if (price >= 0.01) return price.toFixed(4);
   return price.toPrecision(4);
 }
+
+const bannerBase = "bg-bg-chat border-b border-border overflow-hidden h-[38px] flex items-center flex-shrink-0";
 
 export function TickerBanner() {
   const { data, loading, error } = usePolling<Ticker[]>("/ticker/banner", 15_000);
@@ -28,43 +29,39 @@ export function TickerBanner() {
 
   if (loading && !data) {
     return (
-      <div className="ticker-banner ticker-banner--skeleton" aria-hidden="true">
-        <span className="ticker-banner__loading">Cargando precios...</span>
+      <div className={`${bannerBase} opacity-50`} aria-hidden="true">
+        <span className="text-[0.78rem] text-text-muted px-4">Cargando precios...</span>
       </div>
     );
   }
 
   if (error && !data) {
     return (
-      <div className="ticker-banner" aria-hidden="true">
-        <span className="ticker-banner__loading">
-          Error al cargar precios
-        </span>
+      <div className={bannerBase} aria-hidden="true">
+        <span className="text-[0.78rem] text-text-muted px-4">Error al cargar precios</span>
       </div>
     );
   }
 
   if (!data || data.length === 0) {
-    return <div className="ticker-banner" aria-hidden="true" />;
+    return <div className={bannerBase} aria-hidden="true" />;
   }
 
   return (
-    <div className="ticker-banner" aria-label="Precios en tiempo real">
-      <div className="ticker-banner__track">
+    <div className={bannerBase} aria-label="Precios en tiempo real">
+      <div className="flex animate-ticker-scroll whitespace-nowrap hover:[animation-play-state:paused] focus-within:[animation-play-state:paused]">
         {doubled.map((t) => (
           <span
             key={`${t.symbol}-${t.half}`}
-            className="ticker-banner__item"
+            className="inline-flex gap-1.5 items-center text-[0.78rem] px-5 border-r border-border"
           >
-            <span className="ticker-banner__symbol">
+            <span className="text-text-secondary font-bold tracking-wide">
               {t.symbol.replace("USDT", "")}
             </span>
-            <span className="ticker-banner__price">${formatPrice(t.price)}</span>
+            <span className="text-text-primary tabular-nums">${formatPrice(t.price)}</span>
             <span
-              className={`ticker-banner__change ${
-                t.change_pct >= 0
-                  ? "ticker-banner__change--up"
-                  : "ticker-banner__change--down"
+              className={`tabular-nums text-[0.72rem] ${
+                t.change_pct >= 0 ? "text-green" : "text-red"
               }`}
             >
               {t.change_pct >= 0 ? "+" : ""}

@@ -15,7 +15,6 @@ const MAX_HISTORY_TURNS = 10;
 import { postJson, getJson } from "../api";
 import { extractSymbol } from "../utils/symbols";
 import { CandleChart } from "./CandleChart";
-import "./ChatPanel.css";
 
 export interface ChatHandle {
   injectText: (text: string) => void;
@@ -29,13 +28,6 @@ interface Message {
   klines?: Kline[] | null;
 }
 
-/**
- * Build the compact conversation history the gateway forwards to the agent.
- *
- * For user messages we send the raw text. For assistant messages we send
- * ONLY the resolved symbol + intent — the reviewer text would just bloat
- * the prompt without giving the intent_router useful signal.
- */
 function buildHistory(messages: Message[]): ConversationTurn[] {
   return messages.slice(-MAX_HISTORY_TURNS).map((m) =>
     m.role === "user"
@@ -49,9 +41,9 @@ function buildHistory(messages: Message[]): ConversationTurn[] {
 }
 
 function getContextColor(ratio: number): string {
-  if (ratio > 0.9) return "var(--red)";
+  if (ratio > 0.9) return "var(--color-red)";
   if (ratio > 0.7) return "#ff9800";
-  return "var(--accent)";
+  return "var(--color-accent)";
 }
 
 export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) {
@@ -70,7 +62,6 @@ export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) 
     scrollToBottom();
   }, [messages]);
 
-  // Abort in-flight requests on unmount
   useEffect(() => {
     return () => {
       abortRef.current?.abort();
@@ -93,7 +84,6 @@ export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) 
     const text = input.trim();
     if (!text || loading) return;
 
-    // Abort any previous in-flight request
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -111,8 +101,6 @@ export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) 
         { signal: controller.signal }
       );
 
-      // Prefer the symbol the agent actually resolved (it may carry over from
-      // history); fall back to the local pattern matcher for older responses.
       const symbol = data.symbol ?? extractSymbol(text);
       let klines: Kline[] | null = null;
 
@@ -156,24 +144,31 @@ export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) 
     }
   };
 
+  const suggestionClass =
+    "bg-[#14141e] text-[#8080a0] border border-[#22223a] rounded-full px-4 py-2 cursor-pointer text-[0.82rem] transition-[background,color,border-color] duration-200 hover:bg-bg-raised hover:text-[#d0d0e8] hover:border-[#3a3a58] focus-visible:outline-2 focus-visible:outline-[#4fc3f7] focus-visible:outline-offset-2";
+
   return (
-    <div className="chat">
-      <div className="chat__messages">
+    <div className="flex flex-col h-full bg-bg-chat">
+      <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-3.5">
         {messages.length === 0 && (
-          <div className="chat__empty">
-            <h2>Crypto Dashboard</h2>
-            <p>Preguntá sobre cualquier criptomoneda</p>
-            <div className="chat__suggestions">
-              <button onClick={() => appendToInput("¿Cuál es el precio de BTC?")}>
+          <div className="flex flex-col items-center justify-center flex-1 text-center text-text-muted px-6 py-10">
+            <h2 className="text-[1.3rem] font-semibold mb-1.5 text-[#7070a0] tracking-[-0.01em]">
+              Crypto Dashboard
+            </h2>
+            <p className="text-[0.85rem] text-[#50506a] max-w-[340px] leading-relaxed">
+              Preguntá sobre cualquier criptomoneda
+            </p>
+            <div className="flex flex-wrap gap-2 mt-6 justify-center max-w-[480px]">
+              <button className={suggestionClass} onClick={() => appendToInput("¿Cuál es el precio de BTC?")}>
                 Precio de BTC
               </button>
-              <button onClick={() => appendToInput("Hacé un análisis de ETH")}>
+              <button className={suggestionClass} onClick={() => appendToInput("Hacé un análisis de ETH")}>
                 Análisis de ETH
               </button>
-              <button onClick={() => appendToInput("¿Cómo está el mercado?")}>
+              <button className={suggestionClass} onClick={() => appendToInput("¿Cómo está el mercado?")}>
                 Estado del mercado
               </button>
-              <button onClick={() => appendToInput("¿Qué es SOL?")}>
+              <button className={suggestionClass} onClick={() => appendToInput("¿Qué es SOL?")}>
                 ¿Qué es SOL?
               </button>
             </div>
@@ -181,8 +176,17 @@ export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) 
         )}
 
         {messages.map((msg, i) => (
-          <div key={i} className={`chat__message chat__message--${msg.role}`}>
-            <div className="chat__bubble">
+          <div
+            key={i}
+            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+          >
+            <div
+              className={`chat__bubble max-w-[76%] px-4 py-3 rounded-[14px] text-[0.9rem] leading-relaxed ${
+                msg.role === "user"
+                  ? "bg-bg-elev-bubble text-[#e0e8f0] rounded-br-sm"
+                  : "bg-bg-raised text-[#c8c8dc] rounded-bl-sm border border-border"
+              }`}
+            >
               {msg.role === "assistant" ? (
                 <>
                   <ReactMarkdown
@@ -212,12 +216,12 @@ export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) 
         ))}
 
         {loading && (
-          <div className="chat__message chat__message--assistant">
-            <div className="chat__bubble chat__bubble--loading">
-              <span className="chat__dots">
-                <span>.</span>
-                <span>.</span>
-                <span>.</span>
+          <div className="flex justify-start">
+            <div className="chat__bubble max-w-[76%] px-5 py-3 rounded-[14px] bg-bg-raised rounded-bl-sm border border-border">
+              <span className="flex gap-1">
+                <span className="animate-blink text-[1.4rem] text-[#50507a]">.</span>
+                <span className="animate-blink text-[1.4rem] text-[#50507a]" style={{ animationDelay: "0.2s" }}>.</span>
+                <span className="animate-blink text-[1.4rem] text-[#50507a]" style={{ animationDelay: "0.4s" }}>.</span>
               </span>
             </div>
           </div>
@@ -227,21 +231,21 @@ export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) 
       </div>
 
       {messages.length > 0 && (
-        <div className="chat__context-bar">
-          <div className="chat__context-track">
+        <div className="flex items-center gap-2.5 px-4 py-1.5 border-t border-[#1a1a2a] bg-bg-input">
+          <div className="flex-1 h-[3px] bg-border rounded-full overflow-hidden">
             <div
-              className="chat__context-fill"
+              className="h-full rounded-full transition-[width,background-color] duration-300"
               style={{
                 width: `${(Math.min(messages.length, MAX_HISTORY_TURNS) / MAX_HISTORY_TURNS) * 100}%`,
                 backgroundColor: getContextColor(Math.min(messages.length, MAX_HISTORY_TURNS) / MAX_HISTORY_TURNS),
               }}
             />
           </div>
-          <span className="chat__context-label">
+          <span className="text-[0.7rem] text-text-muted whitespace-nowrap flex-shrink-0">
             {Math.min(messages.length, MAX_HISTORY_TURNS)}/{MAX_HISTORY_TURNS} contexto
           </span>
           <button
-            className="chat__reset"
+            className="bg-transparent border border-border rounded-sm text-text-muted text-[0.85rem] px-1.5 py-0 cursor-pointer transition-[color,border-color] duration-200 leading-none flex-shrink-0 hover:text-text-primary hover:border-border-soft focus-visible:outline-2 focus-visible:outline-[#4fc3f7] focus-visible:outline-offset-2"
             onClick={() => setMessages([])}
             aria-label="Nueva conversación"
             title="Nueva conversación"
@@ -251,10 +255,10 @@ export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) 
         </div>
       )}
 
-      <div className="chat__input-area">
+      <div className="flex gap-2 px-4 py-3.5 border-t border-[#1a1a2a] bg-bg-input">
         <textarea
           ref={inputRef}
-          className="chat__input"
+          className="flex-1 bg-bg-textarea text-text-primary border border-[#22223a] rounded-[10px] px-3.5 py-2.5 text-[0.9rem] resize-none outline-none transition-[border-color] duration-200 placeholder:text-[#40405a] focus:border-[#3d5a80]"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -264,7 +268,7 @@ export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) 
           aria-label="Escribí un mensaje"
         />
         <button
-          className="chat__send"
+          className="bg-bg-elev-bubble text-[#c0d8f0] border-0 rounded-[10px] px-[18px] py-2.5 cursor-pointer text-[1.1rem] transition-colors duration-200 flex items-center justify-center flex-shrink-0 enabled:hover:bg-[#2a4f78] focus-visible:outline-2 focus-visible:outline-[#4fc3f7] focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed"
           onClick={() => void sendMessage()}
           disabled={loading || !input.trim()}
           aria-label="Enviar mensaje"

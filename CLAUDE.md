@@ -226,7 +226,7 @@ Only the `intent_router` node consumes `state["history"]`. The carryover is **de
 
 **Why this design**: an earlier version did the carryover in Python regardless of intent. After "deberia vender Tron?" → "cómo está el clima en Miami?" it replayed a TRX analysis because Python had no way to know the new question wasn't crypto. The LLM does — it just needs explicit instructions.
 
-History is capped at 10 turns (`MAX_HISTORY_TURNS` in `ChatPanel.tsx`). Refreshing the browser or clicking the ↺ button in the context bar resets the conversation — there is no server-side store. The context bar shows a progress indicator (`N/MAX contexto`) between the message list and the input area. It only renders when there are messages. The bar color shifts from blue (`--accent`) through orange (`#ff9800`) to red (`--red`) as the context window fills up (thresholds at 70% and 90%).
+History is capped at 10 turns (`MAX_HISTORY_TURNS` in `ChatPanel.tsx`). Refreshing the browser or clicking the ↺ button in the context bar resets the conversation — there is no server-side store. The context bar shows a progress indicator (`N/MAX contexto`) between the message list and the input area. It only renders when there are messages. The bar color shifts from blue (`--color-accent`) through orange (`#ff9800`) to red (`--color-red`) as the context window fills up (thresholds at 70% and 90%).
 
 The shared shapes live at `shared/types/chat.ts` (`ConversationTurn`, extended `ChatRequest`/`ChatResponse`, `AgentIntent` union including `'off_topic'`). Both the gateway TypeBox schemas and the frontend hooks reference them.
 
@@ -236,10 +236,10 @@ The shared shapes live at `shared/types/chat.ts` (`ConversationTurn`, extended `
 - **`ChatPanel.tsx`** — ref-forwarded; `injectText(ticker)` lets sidebar components inject coin symbols into chat. Cancels the previous in-flight request via `abortRef` when a new send fires.
 - **`src/api.ts`** — `API_BASE` + `getJson`/`postJson` helpers (single source of truth for the gateway URL).
 - **`src/hooks/{useFetch,usePolling}.ts`** — `AbortController`-aware data hooks used by every sidebar panel.
-- **`src/styles/tokens.css`** — centralized CSS variables; no hex literals scattered across component CSS files.
+- **`src/styles/base.css`** — Tailwind v4 entry point. Declares `@theme` with all design tokens (colors, animations). Also contains `@layer base` (reset, body, scrollbars), `@layer utilities` (keyframe definitions), and `@layer components` (markdown descendant selectors for `.chat__bubble` that can't be expressed as utility classes).
 - `/api/*` requests are proxied by Vite (`vite.config.ts`) to `localhost:8000` (the gateway).
 
-No UI component library — custom CSS per component.
+**Styling**: Tailwind v4 via `@tailwindcss/vite` plugin. No CSS files per component — all styles are inline utility classes. Design tokens defined in `@theme` are available as Tailwind classes (e.g. `bg-bg-raised`, `text-text-muted`, `text-green`). Dynamic color values (heatmap tiles, context bar fill) use `var(--color-*)` in inline `style={}` props since they are runtime-computed.
 
 ## LLM response handling
 

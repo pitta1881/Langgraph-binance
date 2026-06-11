@@ -3,7 +3,6 @@ import { ChatPanel } from "./components/ChatPanel";
 import { Heatmap } from "./components/Heatmap";
 import { TrendingPanel } from "./components/TrendingPanel";
 import { TickerBanner } from "./components/TickerBanner";
-import "./App.css";
 
 export interface ChatHandle {
   injectText: (text: string) => void;
@@ -18,7 +17,6 @@ export default function App() {
     setDrawerOpen(false);
   };
 
-  // Close drawer on Escape
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && drawerOpen) setDrawerOpen(false);
@@ -28,13 +26,13 @@ export default function App() {
   }, [drawerOpen]);
 
   return (
-    <div className="app">
+    <div className="flex flex-col h-screen overflow-hidden">
       <h1 className="sr-only">Crypto Intelligence Dashboard</h1>
 
       <TickerBanner />
 
       <button
-        className="hamburger"
+        className="hidden max-md:flex fixed top-[46px] left-2 z-[200] bg-bg-raised border border-border rounded-sm text-text-secondary w-[34px] h-[34px] cursor-pointer text-lg items-center justify-center transition-colors hover:bg-bg-surface focus-visible:outline-2 focus-visible:outline-[#4fc3f7] focus-visible:outline-offset-2"
         aria-label="Abrir menú"
         aria-expanded={drawerOpen}
         aria-controls="sidebar"
@@ -44,21 +42,21 @@ export default function App() {
       </button>
 
       <div
-        className={`drawer-backdrop${drawerOpen ? " drawer-backdrop--visible" : ""}`}
+        className={`hidden fixed inset-0 bg-black/55 z-[299] backdrop-blur-sm${drawerOpen ? " !block" : ""}`}
         onClick={() => setDrawerOpen(false)}
         aria-hidden="true"
       />
 
-      <div className="app__layout">
+      <div className="flex flex-1 overflow-hidden">
         <aside
           id="sidebar"
-          className={`app__sidebar${drawerOpen ? " app__sidebar--open" : ""}`}
+          className={`w-[300px] min-w-[260px] flex flex-col gap-1.5 p-2.5 overflow-y-auto border-r border-border bg-bg-base max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:w-[280px] max-md:z-[300] max-md:-translate-x-full max-md:transition-transform max-md:duration-[250ms]${drawerOpen ? " max-md:translate-x-0" : ""}`}
         >
           <Heatmap onCoinClick={handleCoinClick} />
           <TrendingPanel onCoinClick={handleCoinClick} />
         </aside>
 
-        <main className="app__main">
+        <main className="flex-1 flex flex-col overflow-hidden">
           <ChatPanel ref={chatRef} />
         </main>
       </div>
