@@ -29,6 +29,8 @@
   --color-accent: #3d6fa8;
   --color-accent-hover: #4a7fc0;
 
+  --radius-md: 8px;
+
   --animate-ticker-scroll: ticker-scroll 40s linear infinite;
   --animate-blink: blink 1.4s infinite both;
 }

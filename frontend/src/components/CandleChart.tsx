@@ -1,103 +1,22 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef } from "react";
+import {
+  createChart,
+  ColorType,
+  CrosshairMode,
+  LineStyle,
+  type IChartApi,
+} from "lightweight-charts";
 import type { Kline } from "../../../shared/types/market.ts";
 
-interface Dims {
-  w: number;
-  h: number;
-  padding: { top: number; bottom: number; left: number; right: number };
-  chartW: number;
-  chartH: number;
+function fmtPrice(price: number): string {
+  if (price >= 10000) return `$${(price / 1000).toFixed(1)}k`;
+  if (price >= 1000) return `$${price.toFixed(0)}`;
+  if (price >= 100) return `$${price.toFixed(2)}`;
+  return `$${price.toFixed(4)}`;
 }
 
-interface PriceRange {
-  maxPrice: number;
-  minPrice: number;
-  priceRange: number;
-}
-
-function normalizeRange(data: Kline[]): PriceRange {
-  const maxPrice = Math.max(...data.map((d) => d.high));
-  const minPrice = Math.min(...data.map((d) => d.low));
-  return { maxPrice, minPrice, priceRange: maxPrice - minPrice || 1 };
-}
-
-function drawGrid(
-  ctx: CanvasRenderingContext2D,
-  dims: Dims,
-  range: PriceRange
-): void {
-  const { w, padding, chartW, chartH } = dims;
-  const { maxPrice, priceRange } = range;
-
-  const gridColor = getComputedStyle(document.documentElement)
-    .getPropertyValue("--border")
-    .trim() || "#1a1a2e";
-  const textColor = getComputedStyle(document.documentElement)
-    .getPropertyValue("--text-faint")
-    .trim() || "#555";
-
-  ctx.strokeStyle = gridColor;
-  ctx.lineWidth = 0.5;
-  ctx.fillStyle = textColor;
-  ctx.font = "10px monospace";
-
-  for (let i = 0; i <= 4; i++) {
-    const y = padding.top + (chartH / 4) * i;
-    ctx.beginPath();
-    ctx.moveTo(padding.left, y);
-    ctx.lineTo(w - padding.right, y);
-    ctx.stroke();
-
-    const price = maxPrice - (priceRange / 4) * i;
-    ctx.fillText(`$${price.toFixed(2)}`, padding.left + 2, y - 3);
-  }
-
-  // Suppress unused variable warning — chartW used by callers but not grid
-  void chartW;
-}
-
-function drawCandles(
-  ctx: CanvasRenderingContext2D,
-  data: Kline[],
-  range: PriceRange,
-  dims: Dims
-): void {
-  const { padding, chartW, chartH } = dims;
-  const { minPrice, priceRange } = range;
-
-  const greenColor = getComputedStyle(document.documentElement)
-    .getPropertyValue("--green")
-    .trim() || "#00c853";
-  const redColor = getComputedStyle(document.documentElement)
-    .getPropertyValue("--red")
-    .trim() || "#ff1744";
-
-  const candleW = chartW / data.length;
-  const bodyW = Math.max(candleW * 0.6, 2);
-
-  const toY = (price: number) =>
-    padding.top + chartH - ((price - minPrice) / priceRange) * chartH;
-
-  data.forEach((d, i) => {
-    const x = padding.left + i * candleW + candleW / 2;
-    const isGreen = d.close >= d.open;
-    const color = isGreen ? greenColor : redColor;
-
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(x, toY(d.high));
-    ctx.lineTo(x, toY(d.low));
-    ctx.stroke();
-
-    const openY = toY(d.open);
-    const closeY = toY(d.close);
-    const bodyTop = Math.min(openY, closeY);
-    const bodyHeight = Math.max(Math.abs(openY - closeY), 1);
-
-    ctx.fillStyle = color;
-    ctx.fillRect(x - bodyW / 2, bodyTop, bodyW, bodyHeight);
-  });
+function css(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
 interface Props {
@@ -107,75 +26,148 @@ interface Props {
 }
 
 export function CandleChart({ data, symbol, title }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
 
-  const draw = useCallback(() => {
-    if (!data || data.length === 0) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    const w = canvas.clientWidth;
-    const h = canvas.clientHeight;
-    canvas.width = w * dpr;
-    canvas.height = h * dpr;
-    ctx.scale(dpr, dpr);
-
-    const bgColor = getComputedStyle(document.documentElement)
-      .getPropertyValue("--bg-surface")
-      .trim() || "#111118";
-    const mutedColor = getComputedStyle(document.documentElement)
-      .getPropertyValue("--text-muted")
-      .trim() || "#888";
-
-    ctx.fillStyle = bgColor;
-    ctx.fillRect(0, 0, w, h);
-
-    const padding = { top: 20, bottom: 20, left: 10, right: 10 };
-    const chartW = w - padding.left - padding.right;
-    const chartH = h - padding.top - padding.bottom;
-    const dims: Dims = { w, h, padding, chartW, chartH };
-    const range = normalizeRange(data);
-
-    drawGrid(ctx, dims, range);
-    drawCandles(ctx, data, range, dims);
-
-    ctx.fillStyle = mutedColor;
-    ctx.font = "11px sans-serif";
-    ctx.fillText(`${symbol} — ${title}`, padding.left + 4, 14);
-  }, [data, symbol, title]);
+  const lastClose = data[data.length - 1]?.close ?? 0;
+  const firstClose = data[0]?.close ?? 0;
+  const changePct = firstClose ? ((lastClose - firstClose) / firstClose) * 100 : 0;
+  const isUp = changePct >= 0;
 
   useEffect(() => {
-    draw();
+    if (!containerRef.current || !data.length) return;
 
-    const container = containerRef.current;
-    if (!container) return;
+    const green     = css("--color-green")      || "#00c853";
+    const red       = css("--color-red")        || "#ff1744";
+    const bgSurface = css("--color-bg-surface") || "#111118";
+    const border    = css("--color-border")     || "#1e1e30";
+    const textFaint = css("--color-text-faint") || "#555555";
+    const textMuted = css("--color-text-muted") || "#666666";
+    const accent    = css("--color-accent")     || "#3d6fa8";
 
-    const observer = new ResizeObserver(() => {
-      draw();
+    const chart = createChart(containerRef.current, {
+      layout: {
+        background: { type: ColorType.Solid, color: bgSurface },
+        textColor: textMuted,
+        fontSize: 11,
+        fontFamily: '"SF Mono", Consolas, monospace',
+      },
+      grid: {
+        vertLines: { color: border, style: LineStyle.Dotted },
+        horzLines: { color: border, style: LineStyle.Dotted },
+      },
+      crosshair: {
+        mode: CrosshairMode.Normal,
+        vertLine: {
+          color: textFaint,
+          labelBackgroundColor: accent,
+          style: LineStyle.Dashed,
+          width: 1,
+        },
+        horzLine: {
+          color: textFaint,
+          labelBackgroundColor: accent,
+          style: LineStyle.Dashed,
+          width: 1,
+        },
+      },
+      rightPriceScale: {
+        borderColor: border,
+        scaleMargins: { top: 0.08, bottom: 0.22 },
+      },
+      timeScale: {
+        borderColor: border,
+        timeVisible: true,
+        secondsVisible: false,
+        fixLeftEdge: true,
+        fixRightEdge: true,
+      },
+      handleScroll: true,
+      handleScale: true,
+      width: containerRef.current.clientWidth,
+      height: 320,
     });
-    observer.observe(container);
 
-    return () => observer.disconnect();
-  }, [draw]);
+    chartRef.current = chart;
+
+    // Candle series
+    const candleSeries = chart.addCandlestickSeries({
+      upColor:         green,
+      downColor:       red,
+      borderUpColor:   green,
+      borderDownColor: red,
+      wickUpColor:     green + "cc",
+      wickDownColor:   red   + "cc",
+    });
+
+    candleSeries.setData(
+      data.map((d) => ({
+        time:  Math.floor(d.open_time / 1000) as unknown as import("lightweight-charts").Time,
+        open:  d.open,
+        high:  d.high,
+        low:   d.low,
+        close: d.close,
+      }))
+    );
+
+    // Volume histogram
+    const volSeries = chart.addHistogramSeries({
+      color:       green + "44",
+      priceFormat: { type: "volume" },
+      priceScaleId: "vol",
+    });
+
+    chart.priceScale("vol").applyOptions({
+      scaleMargins: { top: 0.82, bottom: 0 },
+    });
+
+    volSeries.setData(
+      data.map((d) => ({
+        time:  Math.floor(d.open_time / 1000) as unknown as import("lightweight-charts").Time,
+        value: d.volume,
+        color: (d.close >= d.open ? green : red) + "44",
+      }))
+    );
+
+    chart.timeScale().fitContent();
+
+    const ro = new ResizeObserver(() => {
+      if (containerRef.current) {
+        chart.applyOptions({ width: containerRef.current.clientWidth });
+      }
+    });
+    ro.observe(containerRef.current);
+
+    return () => {
+      ro.disconnect();
+      chart.remove();
+      chartRef.current = null;
+    };
+  }, [data]);
 
   return (
-    <div ref={containerRef} className="candle-chart">
-      <canvas
-        ref={canvasRef}
-        role="img"
-        aria-label={`Gráfico de velas de ${symbol}, últimos 7 días, intervalo 4 horas`}
-        style={{
-          width: "100%",
-          height: "200px",
-          borderRadius: "var(--radius-md)",
-          marginTop: "8px",
-          display: "block",
-        }}
+    <div className="mt-2">
+      <div className="flex items-center justify-between mb-1.5 px-0.5">
+        <span className="text-[10px] font-semibold text-text-secondary tracking-widest uppercase">
+          {symbol.replace("USDT", "")} / USDT · {title}
+        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[13px] font-bold text-text-primary tabular-nums">
+            {fmtPrice(lastClose)}
+          </span>
+          <span
+            className={`text-[10px] px-1.5 py-0.5 rounded font-semibold tabular-nums ${
+              isUp ? "bg-green/10 text-green" : "bg-red/10 text-red"
+            }`}
+          >
+            {isUp ? "+" : ""}
+            {changePct.toFixed(2)}%
+          </span>
+        </div>
+      </div>
+      <div
+        ref={containerRef}
+        style={{ width: "100%", height: "320px", borderRadius: "6px", overflow: "hidden" }}
       />
     </div>
   );
