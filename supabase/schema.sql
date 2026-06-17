@@ -35,8 +35,12 @@ create index if not exists chats_session_idx on chats(session_id);
 create index if not exists node_traces_chat_idx on node_traces(chat_id);
 create index if not exists node_traces_chat_created_idx on node_traces(chat_id, created_at);
 
--- RLS stays OFF on these tables: only the service_role key (used by gateway
--- and agent service) writes; the admin dashboard reads via the gateway, which
--- gates access with ADMIN_EMAILS. Frontend never queries these directly.
-alter table chats disable row level security;
-alter table node_traces disable row level security;
+-- RLS is ON with NO policies. The frontend never queries these tables
+-- directly — it goes through the gateway's /admin/* endpoints which use the
+-- service_role key (RLS-exempt by design). Anon/authenticated clients hitting
+-- the auto-generated REST API get denied because no policy permits them.
+-- This is the prod-safe stance: Supabase's REST API auto-exposes every public
+-- table, so leaving RLS off would let anyone with the anon key (which ships in
+-- the browser bundle) read every chat.
+alter table chats enable row level security;
+alter table node_traces enable row level security;
