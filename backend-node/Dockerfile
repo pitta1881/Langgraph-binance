@@ -8,7 +8,17 @@ RUN npm ci
 COPY frontend/ ./
 COPY shared/ /build/shared/
 
+# Vite reads VITE_* from process.env at build time. ARG declares them so
+# Railway forwards the service env vars into the build context; ENV re-exports
+# them so the npm build subprocess actually sees them in process.env.
 ARG VITE_API_URL=""
+ARG VITE_SUPABASE_URL=""
+ARG VITE_SUPABASE_ANON_KEY=""
+ARG VITE_ADMIN_EMAILS=""
+ENV VITE_API_URL=$VITE_API_URL \
+    VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
+    VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY \
+    VITE_ADMIN_EMAILS=$VITE_ADMIN_EMAILS
 RUN npm run build
 
 
