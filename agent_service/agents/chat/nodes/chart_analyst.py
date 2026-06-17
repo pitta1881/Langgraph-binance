@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -45,12 +46,16 @@ async def chart_analyst(state: ChatState) -> ChatState:
         )
     )
 
+    t0 = time.perf_counter()
     try:
-        llm = _llm()
+        llm = _llm(state)
         response = await llm.ainvoke([system, user])
         analysis = _extract_text(response)
-        _log_llm("chart_analyst", [system, user], analysis)
+        latency_ms = int((time.perf_counter() - t0) * 1000)
+        _log_llm(state, "chart_analyst", [system, user], analysis, latency_ms)
     except Exception as exc:
+        latency_ms = int((time.perf_counter() - t0) * 1000)
+        _log_llm(state, "chart_analyst", [system, user], None, latency_ms, error=str(exc))
         logger.error("chart_analyst failed: %s", exc, exc_info=True)
         analysis = f"Technical analysis unavailable for {symbol}."
 

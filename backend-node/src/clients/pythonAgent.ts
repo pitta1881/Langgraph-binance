@@ -24,17 +24,23 @@ export class PythonAgentClient {
 
   async runAgent(
     message: string,
-    history?: ConversationTurn[],
+    opts: {
+      history?: ConversationTurn[];
+      model?: string;
+      session_id: string;
+      chat_id: string;
+    },
     log?: FastifyBaseLogger,
   ): Promise<AgentState> {
+    const { history, model, session_id, chat_id } = opts;
     const logger = log ?? this.log;
     const url = `${this.baseUrl}/run-agent`;
     const historyTurns = history?.length ?? 0;
     logger.debug({ url, message, historyTurns }, 'pythonAgent: dispatching');
 
-    const body = history && history.length > 0
-      ? { message, history }
-      : { message };
+    const body: Record<string, unknown> = { message, session_id, chat_id };
+    if (history && history.length > 0) body.history = history;
+    if (model) body.model = model;
 
     const res = await fetchWithTimeout(
       url,
@@ -47,8 +53,8 @@ export class PythonAgentClient {
     );
 
     if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Python agent ${res.status}: ${body.slice(0, 200)}`);
+      const errText = await res.text();
+      throw new Error(`Python agent ${res.status}: ${errText.slice(0, 200)}`);
     }
 
     let state: AgentState;

@@ -1,18 +1,22 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from ....settings import settings
 
+if TYPE_CHECKING:
+    from ....agents.shared.state import ChatState
+
 logger = logging.getLogger(__name__)
 
 
-def _llm(temperature: float = 0.3) -> ChatGoogleGenerativeAI:
+def _llm(state: "ChatState | None" = None, temperature: float = 0.3) -> ChatGoogleGenerativeAI:
+    model = (state or {}).get("model") or settings.AI_MODEL
     return ChatGoogleGenerativeAI(
-        model=settings.AI_MODEL,
+        model=model,
         temperature=temperature,
         google_api_key=settings.AI_API_KEY,
     )
@@ -47,12 +51,42 @@ def _extract_text(response: Any) -> str:
     return str(content)
 
 
-def _log_llm(node: str, messages: list, response: str) -> None:
+def _log_llm(
+    state: "ChatState | None",
+    node_name: str,
+    messages: list,
+    response_text: str | None,
+    latency_ms: int,
+    error: str | None = None,
+) -> None:
     logger.debug(
-        "[%s] LLM call — messages=%d, response_len=%d",
-        node,
+        "[%s] llm call: %d msgs, %s chars",
+        node_name,
         len(messages),
-        len(response),
+        len(response_text or ""),
+    )
+    state = state or {}
+    chat_id = state.get("chat_id")
+    logger.info("[trace] node=%s chat_id=%s has_state=%s", node_name, chat_id, bool(state))
+    if not chat_id:
+        return
+    prompt_system = next(
+        (m.content for m in messages if m.__class__.__name__ == "SystemMessage"), None
+    )
+    prompt_user = next(
+        (m.content for m in messages if m.__class__.__name__ == "HumanMessage"), None
+    )
+    model = state.get("model") or settings.AI_MODEL
+    from agent_service.supabase_client import insert_trace  # local import avoids circular
+    insert_trace(
+        chat_id=chat_id,
+        node_name=node_name,
+        model=model,
+        prompt_system=prompt_system if isinstance(prompt_system, str) else str(prompt_system) if prompt_system else None,
+        prompt_user=prompt_user if isinstance(prompt_user, str) else str(prompt_user) if prompt_user else None,
+        response=response_text,
+        latency_ms=latency_ms,
+        error=error,
     )
 
 

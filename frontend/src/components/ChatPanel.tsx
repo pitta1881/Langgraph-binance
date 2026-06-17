@@ -15,6 +15,11 @@ const MAX_HISTORY_TURNS = 10;
 import { postJson, getJson } from "../api";
 import { extractSymbol } from "../utils/symbols";
 import { CandleChart } from "./CandleChart";
+import { Select } from "./Select";
+import { useAuth } from "../auth/useAuth";
+
+const MODELS = ['gemini-3.1-flash-lite', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp'] as const;
+const DEFAULT_MODEL = 'gemini-3.1-flash-lite';
 
 export interface ChatHandle {
   injectText: (text: string) => void;
@@ -42,17 +47,25 @@ function buildHistory(messages: Message[]): ConversationTurn[] {
 
 function getContextColor(ratio: number): string {
   if (ratio > 0.9) return "var(--color-red)";
-  if (ratio > 0.7) return "#ff9800";
+  if (ratio > 0.7) return "var(--color-warning)";
   return "var(--color-accent)";
 }
 
 export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) {
+  const { user, signInWithGoogle } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  const [sessionId] = useState(() => crypto.randomUUID());
+  const [model, setModel] = useState<string>(() => localStorage.getItem('preferred_model') || DEFAULT_MODEL);
+
+  useEffect(() => {
+    localStorage.setItem('preferred_model', model);
+  }, [model]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -97,7 +110,7 @@ export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) 
       const history = buildHistory(messages);
       const data = await postJson<ChatResponse, ChatRequest>(
         "/chat",
-        { message: text, history },
+        { message: text, history, model, session_id: sessionId },
         { signal: controller.signal }
       );
 
@@ -147,6 +160,25 @@ export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) 
   const suggestionClass =
     "bg-[#14141e] text-[#8080a0] border border-[#22223a] rounded-full px-4 py-2 cursor-pointer text-[0.82rem] transition-[background,color,border-color] duration-200 hover:bg-bg-raised hover:text-[#d0d0e8] hover:border-[#3a3a58] focus-visible:outline-2 focus-visible:outline-[#4fc3f7] focus-visible:outline-offset-2";
 
+  if (!user) {
+    return (
+      <div className="flex flex-col h-full bg-bg-chat">
+        <div className="flex-1 flex items-center justify-center text-center px-6">
+          <div className="max-w-sm">
+            <h2 className="text-lg font-semibold text-text-primary mb-2">Inicia sesion para chatear</h2>
+            <p className="text-sm text-text-muted mb-4">Necesitas una cuenta de Google para conversar con el asistente.</p>
+            <button
+              onClick={() => void signInWithGoogle()}
+              className="bg-accent text-white px-4 py-2 rounded-md text-sm hover:opacity-90 transition-opacity"
+            >
+              Continuar con Google
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full bg-bg-chat">
       <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-3.5">
@@ -156,20 +188,20 @@ export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) 
               Crypto Dashboard
             </h2>
             <p className="text-[0.85rem] text-[#50506a] max-w-[340px] leading-relaxed">
-              Preguntá sobre cualquier criptomoneda
+              Pregunta sobre cualquier criptomoneda
             </p>
             <div className="flex flex-wrap gap-2 mt-6 justify-center max-w-[480px]">
-              <button className={suggestionClass} onClick={() => appendToInput("¿Cuál es el precio de BTC?")}>
+              <button className={suggestionClass} onClick={() => appendToInput("Cual es el precio de BTC?")}>
                 Precio de BTC
               </button>
-              <button className={suggestionClass} onClick={() => appendToInput("Hacé un análisis de ETH")}>
-                Análisis de ETH
+              <button className={suggestionClass} onClick={() => appendToInput("Hace un analisis de ETH")}>
+                Analisis de ETH
               </button>
-              <button className={suggestionClass} onClick={() => appendToInput("¿Cómo está el mercado?")}>
+              <button className={suggestionClass} onClick={() => appendToInput("Como esta el mercado?")}>
                 Estado del mercado
               </button>
-              <button className={suggestionClass} onClick={() => appendToInput("¿Qué es SOL?")}>
-                ¿Qué es SOL?
+              <button className={suggestionClass} onClick={() => appendToInput("Que es SOL?")}>
+                Que es SOL?
               </button>
             </div>
           </div>
@@ -247,10 +279,10 @@ export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) 
           <button
             className="bg-transparent border border-border rounded-sm text-text-muted text-[0.85rem] px-1.5 py-0 cursor-pointer transition-[color,border-color] duration-200 leading-none flex-shrink-0 hover:text-text-primary hover:border-border-soft focus-visible:outline-2 focus-visible:outline-[#4fc3f7] focus-visible:outline-offset-2"
             onClick={() => setMessages([])}
-            aria-label="Nueva conversación"
-            title="Nueva conversación"
+            aria-label="Nueva conversacion"
+            title="Nueva conversacion"
           >
-            ↺
+            &#8635;
           </button>
         </div>
       )}
@@ -262,10 +294,10 @@ export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) 
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Preguntá sobre cripto..."
+          placeholder="Pregunta sobre cripto..."
           rows={1}
           disabled={loading}
-          aria-label="Escribí un mensaje"
+          aria-label="Escribe un mensaje"
         />
         <button
           className="bg-bg-elev-bubble text-[#c0d8f0] border-0 rounded-[10px] px-[18px] py-2.5 cursor-pointer text-[1.1rem] transition-colors duration-200 flex items-center justify-center flex-shrink-0 enabled:hover:bg-[#2a4f78] focus-visible:outline-2 focus-visible:outline-[#4fc3f7] focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed"
@@ -275,6 +307,19 @@ export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) 
         >
           {loading ? "⏳" : "➤"}
         </button>
+      </div>
+
+      <div className="px-4 py-2 border-t border-border-soft flex items-center gap-3 flex-wrap bg-bg-input">
+        <label className="text-xs text-text-muted">Modelo:</label>
+        <Select
+          value={model as typeof MODELS[number]}
+          options={MODELS}
+          onChange={(v) => setModel(v)}
+          ariaLabel="Modelo de lenguaje"
+        />
+        <span className="ml-auto text-[11px] text-text-muted text-right">
+          Este asistente puede cometer errores. La informacion no constituye asesoramiento financiero.
+        </span>
       </div>
     </div>
   );

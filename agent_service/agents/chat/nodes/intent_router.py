@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -55,11 +56,13 @@ async def intent_router(state: ChatState) -> ChatState:
     system = SystemMessage(content="".join(system_parts))
     user = HumanMessage(content=user_message)
 
+    t0 = time.perf_counter()
     try:
-        llm = _llm(temperature=0)
+        llm = _llm(state, temperature=0)
         response = await llm.ainvoke([system, user])
         text = _extract_text(response)
-        _log_llm("intent_router", [system, user], text)
+        latency_ms = int((time.perf_counter() - t0) * 1000)
+        _log_llm(state, "intent_router", [system, user], text, latency_ms)
 
         cleaned = text.strip()
         if cleaned.startswith("```"):
@@ -85,6 +88,8 @@ async def intent_router(state: ChatState) -> ChatState:
         # JSON parse failure or LLM error: graceful fallback.
         # If we have a local symbol or one in history, treat it as analysis;
         # otherwise off_topic so we don't burn LLM calls on garbage.
+        latency_ms = int((time.perf_counter() - t0) * 1000)
+        _log_llm(state, "intent_router", [system, user], None, latency_ms, error=str(exc))
         logger.warning("intent_router failed: %s", exc)
         if not symbol:
             symbol = _last_symbol_from_history(history)

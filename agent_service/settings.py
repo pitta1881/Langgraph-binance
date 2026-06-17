@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     AI_API_KEY: str = ""
     AI_MODEL: str = "gemini-2.0-flash"
     LOG_LEVEL: str = "INFO"
+    SUPABASE_URL: str = ""
+    SUPABASE_SERVICE_ROLE_KEY: str = ""
 
     class Config:
         env_file = str(_ENV_FILE)

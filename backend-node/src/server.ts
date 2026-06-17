@@ -14,7 +14,10 @@ import { ConfigSchema } from './config.ts';
 import { binanceClientPlugin } from './plugins/binance.ts';
 import { coingeckoClientPlugin } from './plugins/coingecko.ts';
 import { pythonAgentClientPlugin } from './plugins/pythonAgent.ts';
+import { supabasePlugin } from './plugins/supabase.ts';
+import { authPlugin } from './plugins/auth.ts';
 import { swaggerPlugin } from './plugins/swagger.ts';
+import { adminRoutes } from './routes/admin.ts';
 import { chatRoutes } from './routes/chat.ts';
 import { healthRoutes } from './routes/health.ts';
 import { heatmapRoutes } from './routes/heatmap.ts';
@@ -63,6 +66,8 @@ async function buildServer() {
   await fastify.register(binanceClientPlugin);
   await fastify.register(coingeckoClientPlugin);
   await fastify.register(pythonAgentClientPlugin);
+  await fastify.register(supabasePlugin);
+  await fastify.register(authPlugin);
 
   await fastify.register(fastifyCors, {
     origin: true,
@@ -79,6 +84,7 @@ async function buildServer() {
   await fastify.register(klinesRoutes);
   await fastify.register(trendingRoutes);
   await fastify.register(chatRoutes);
+  await fastify.register(adminRoutes);
 
   if (!isDev) {
     const __dirname = path.dirname(fileURLToPath(import.meta.url));

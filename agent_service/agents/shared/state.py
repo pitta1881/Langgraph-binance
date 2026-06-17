@@ -32,3 +32,5 @@ class ChatState(TypedDict, total=False):
     crypto_analysis: str
     response: str
     history: list[ConversationTurn]
+    model: str | None
+    chat_id: str | None

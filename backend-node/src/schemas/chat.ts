@@ -19,6 +19,16 @@ void _turnCheck;
 export const ChatRequestSchema = Type.Object({
   message: Type.String({ minLength: 1 }),
   history: Type.Optional(Type.Array(ConversationTurnSchema, { maxItems: 10 })),
+  model: Type.Optional(Type.Union([
+    Type.Literal('gemini-3.1-flash-lite'),
+    Type.Literal('gemini-2.0-flash'),
+    Type.Literal('gemini-1.5-flash'),
+    Type.Literal('gemini-1.5-pro'),
+    Type.Literal('gemini-2.0-flash-exp'),
+  ])),
+  session_id: Type.String({
+    pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  }),
 });
 export type ChatRequest = Static<typeof ChatRequestSchema>;
 const _chatRequestCheck: SharedChatRequest = {} as ChatRequest;

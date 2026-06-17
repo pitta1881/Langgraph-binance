@@ -15,6 +15,10 @@ export const ConfigSchema = Type.Object({
   BINANCE_BASE_URL: Type.String({ default: 'https://api.binance.com' }),
   COINGECKO_BASE_URL: Type.String({ default: 'https://api.coingecko.com' }),
   COINGECKO_API_KEY: Type.String({ default: '' }),
+  SUPABASE_URL: Type.String({ default: '' }),
+  SUPABASE_ANON_KEY: Type.String({ default: '' }),
+  SUPABASE_SERVICE_ROLE_KEY: Type.String({ default: '' }),
+  ADMIN_EMAILS: Type.String({ default: '' }),
 });
 
 export type Config = Static<typeof ConfigSchema>;

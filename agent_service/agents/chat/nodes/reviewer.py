@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -47,12 +48,16 @@ async def reviewer(state: ChatState) -> ChatState:
         )
     )
 
+    t0 = time.perf_counter()
     try:
-        llm = _llm()
+        llm = _llm(state)
         response = await llm.ainvoke([system, user])
         final = _extract_text(response)
-        _log_llm("reviewer", [system, user], final)
+        latency_ms = int((time.perf_counter() - t0) * 1000)
+        _log_llm(state, "reviewer", [system, user], final, latency_ms)
     except Exception as exc:
+        latency_ms = int((time.perf_counter() - t0) * 1000)
+        _log_llm(state, "reviewer", [system, user], None, latency_ms, error=str(exc))
         logger.warning("reviewer failed: %s", exc)
         final = (
             f"Análisis de {symbol}:\n\n"

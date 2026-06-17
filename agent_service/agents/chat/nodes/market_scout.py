@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -42,12 +43,16 @@ async def market_scout(state: ChatState) -> ChatState:
         content=f"User: {state.get('user_message', '')}\n\nMarket data:\n{market_data}"
     )
 
+    t0 = time.perf_counter()
     try:
-        llm = _llm()
+        llm = _llm(state)
         response = await llm.ainvoke([system, user])
         final = _extract_text(response)
-        _log_llm("market_scout", [system, user], final)
+        latency_ms = int((time.perf_counter() - t0) * 1000)
+        _log_llm(state, "market_scout", [system, user], final, latency_ms)
     except Exception as exc:
+        latency_ms = int((time.perf_counter() - t0) * 1000)
+        _log_llm(state, "market_scout", [system, user], None, latency_ms, error=str(exc))
         logger.warning("market_scout LLM failed: %s", exc)
         final = market_data
 

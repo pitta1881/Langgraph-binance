@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -35,12 +36,16 @@ async def crypto_expert(state: ChatState) -> ChatState:
         )
     )
 
+    t0 = time.perf_counter()
     try:
-        llm = _llm()
+        llm = _llm(state)
         response = await llm.ainvoke([system, user])
         analysis = _extract_text(response)
-        _log_llm("crypto_expert", [system, user], analysis)
+        latency_ms = int((time.perf_counter() - t0) * 1000)
+        _log_llm(state, "crypto_expert", [system, user], analysis, latency_ms)
     except Exception as exc:
+        latency_ms = int((time.perf_counter() - t0) * 1000)
+        _log_llm(state, "crypto_expert", [system, user], None, latency_ms, error=str(exc))
         logger.warning("crypto_expert failed: %s", exc)
         analysis = f"Crypto analysis unavailable for {symbol}."
 

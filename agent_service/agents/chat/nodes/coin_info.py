@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -46,13 +47,17 @@ async def coin_info_responder(state: ChatState) -> ChatState:
         )
     )
 
+    msgs = [system, user]
+    t0 = time.perf_counter()
     try:
-        msgs = [system, user]
-        llm = _llm()
+        llm = _llm(state)
         response = await llm.ainvoke(msgs)
         final = _extract_text(response)
-        _log_llm("coin_info_responder", msgs, final)
+        latency_ms = int((time.perf_counter() - t0) * 1000)
+        _log_llm(state, "coin_info", msgs, final, latency_ms)
     except Exception as exc:
+        latency_ms = int((time.perf_counter() - t0) * 1000)
+        _log_llm(state, "coin_info", msgs, None, latency_ms, error=str(exc))
         logger.warning("coin_info_responder LLM failed: %s", exc)
         final = f"Información de {symbol.replace('USDT', '')}:\n\n{info}"
 

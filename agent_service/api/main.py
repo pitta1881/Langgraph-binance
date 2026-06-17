@@ -57,6 +57,9 @@ logger.info("Crypto Agent Service started — graph compiled")
 class RunAgentRequest(BaseModel):
     message: str
     history: list[dict[str, Any]] | None = None
+    model: str | None = None
+    session_id: str | None = None
+    chat_id: str | None = None
 
 
 @app.post("/run-agent")
@@ -67,6 +70,8 @@ async def run_agent(req: RunAgentRequest) -> dict:
     state = await graph.ainvoke({
         "user_message": req.message,
         "history": history,
+        "model": req.model,
+        "chat_id": req.chat_id,
     })
     logger.debug("run_agent finished — intent=%s symbol=%s",
                  state.get("intent"), state.get("symbol"))
