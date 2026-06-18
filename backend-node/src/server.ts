@@ -11,29 +11,33 @@ import {
 } from '@fastify/type-provider-typebox';
 
 import { ConfigSchema } from './config.ts';
-import { binanceClientPlugin } from './plugins/binance.ts';
-import { coingeckoClientPlugin } from './plugins/coingecko.ts';
-import { pythonAgentClientPlugin } from './plugins/pythonAgent.ts';
-import { supabasePlugin } from './plugins/supabase.ts';
-import { authPlugin } from './plugins/auth.ts';
-import { swaggerPlugin } from './plugins/swagger.ts';
-import { adminRoutes } from './routes/admin.ts';
-import { chatRoutes } from './routes/chat.ts';
-import { favoritesRoutes } from './routes/favorites.ts';
-import { healthRoutes } from './routes/health.ts';
-import { heatmapRoutes } from './routes/heatmap.ts';
-import { klinesRoutes } from './routes/klines.ts';
-import { sessionsRoutes } from './routes/sessions.ts';
-import { tickerBannerRoutes } from './routes/tickerBanner.ts';
-import { trendingRoutes } from './routes/trending.ts';
+import { authPlugin } from './shared/plugins/auth.ts';
+import { swaggerPlugin } from './shared/plugins/swagger.ts';
+import { createSupabaseClient } from './shared/infrastructure/supabase.client.ts';
+import { BinanceClient } from './shared/infrastructure/binance.client.ts';
+import { CoingeckoClient } from './shared/infrastructure/coingecko.client.ts';
+import { PythonAgentClient } from './shared/infrastructure/pythonAgent.client.ts';
+import { registerHealthModule } from './modules/health/index.ts';
+import { registerMarketModule } from './modules/market/index.ts';
+import { registerChatModule } from './modules/chat/index.ts';
+import { registerFavoritesModule } from './modules/favorites/index.ts';
+import { registerSessionsModule } from './modules/sessions/index.ts';
+import { registerAdminModule } from './modules/admin/index.ts';
 
 /**
  * Boots the Fastify gateway.
  *
- * Order matters: env first (we need PORT/LOG_LEVEL before anything else),
- * then client plugins (they read from fastify.config), then CORS, then routes.
- * Each plugin is awaited so a failure here means the process exits with a
- * non-zero code instead of accepting traffic in a broken state.
+ * Bootstrap order:
+ *   1. Env + CORS + TypeBox.
+ *   2. Instantiate infrastructure (Supabase + external HTTP clients) ONCE,
+ *      passing them around via DI.
+ *   3. Register cross-cutting plugins (auth, swagger). Auth receives the
+ *      Supabase client through its options — no decorators on fastify for
+ *      external systems.
+ *   4. Register one module per feature under `/api`. Each module wires its
+ *      own controller → service → repository graph.
+ *   5. In production: static SPA + a notFoundHandler that distinguishes
+ *      `/api/*` (JSON 404) from SPA paths (index.html fallback).
  */
 async function buildServer() {
   const isDev = process.env.NODE_ENV !== 'production';
@@ -63,38 +67,43 @@ async function buildServer() {
     confKey: 'config',
   });
 
-  // Client plugins — constructed once per app lifetime; visible to all routes
-  // because fastify-plugin bypasses Fastify's encapsulation scope.
-  await fastify.register(binanceClientPlugin);
-  await fastify.register(coingeckoClientPlugin);
-  await fastify.register(pythonAgentClientPlugin);
-  await fastify.register(supabasePlugin);
-  await fastify.register(authPlugin);
-
   await fastify.register(fastifyCors, {
     origin: true,
     credentials: true,
   });
 
-  // Swagger MUST be registered before any route — it hooks into route
-  // registration to capture schemas and build the OpenAPI document.
+  // 2 — Infrastructure singletons. Injected by value into each module.
+  const supabase = createSupabaseClient(fastify.config);
+  const binance = new BinanceClient(fastify.config.BINANCE_BASE_URL, fastify.log);
+  const coingecko = new CoingeckoClient(
+    fastify.config.COINGECKO_BASE_URL,
+    fastify.config.COINGECKO_API_KEY,
+    fastify.log,
+  );
+  const pythonAgent = new PythonAgentClient(fastify.config.PYTHON_AGENT_URL, fastify.log);
+
+  // 3 — Cross-cutting Fastify plugins (decorate request/instance).
+  const adminEmails = fastify.config.ADMIN_EMAILS
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  await fastify.register(authPlugin, { supabase, adminEmails });
   await fastify.register(swaggerPlugin);
 
+  // 4 — Feature modules under /api.
   await fastify.register(
     async (api) => {
-      await api.register(healthRoutes);
-      await api.register(heatmapRoutes);
-      await api.register(tickerBannerRoutes);
-      await api.register(klinesRoutes);
-      await api.register(trendingRoutes);
-      await api.register(chatRoutes);
-      await api.register(favoritesRoutes);
-      await api.register(sessionsRoutes);
-      await api.register(adminRoutes);
+      await registerHealthModule(api);
+      await registerMarketModule(api, { binance, coingecko });
+      await registerChatModule(api, { supabase, pythonAgent });
+      await registerFavoritesModule(api, { supabase });
+      await registerSessionsModule(api, { supabase });
+      await registerAdminModule(api, { supabase });
     },
     { prefix: '/api' },
   );
 
+  // 5 — SPA static + 404 fallback (production only).
   if (!isDev) {
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
     const staticRoot = path.join(__dirname, '..', 'public');
