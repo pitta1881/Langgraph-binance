@@ -30,17 +30,29 @@ create table if not exists node_traces (
   created_at timestamptz not null default now()
 );
 
+-- Per-user favorite coins. PK (user_id, symbol) makes it idempotent: re-adding
+-- the same symbol is a no-op upsert.
+create table if not exists user_favorites (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  symbol text not null,
+  created_at timestamptz not null default now(),
+  primary key (user_id, symbol)
+);
+
 create index if not exists chats_user_created_idx on chats(user_id, created_at desc);
 create index if not exists chats_session_idx on chats(session_id);
 create index if not exists node_traces_chat_idx on node_traces(chat_id);
 create index if not exists node_traces_chat_created_idx on node_traces(chat_id, created_at);
+create index if not exists user_favorites_user_created_idx
+  on user_favorites(user_id, created_at desc);
 
 -- RLS is ON with NO policies. The frontend never queries these tables
--- directly — it goes through the gateway's /admin/* endpoints which use the
--- service_role key (RLS-exempt by design). Anon/authenticated clients hitting
--- the auto-generated REST API get denied because no policy permits them.
--- This is the prod-safe stance: Supabase's REST API auto-exposes every public
--- table, so leaving RLS off would let anyone with the anon key (which ships in
--- the browser bundle) read every chat.
+-- directly — it goes through the gateway's authenticated endpoints which use
+-- the service_role key (RLS-exempt by design). Anon/authenticated clients
+-- hitting the auto-generated REST API get denied because no policy permits
+-- them. This is the prod-safe stance: Supabase's REST API auto-exposes every
+-- public table, so leaving RLS off would let anyone with the anon key (which
+-- ships in the browser bundle) read every chat or favorite.
 alter table chats enable row level security;
 alter table node_traces enable row level security;
+alter table user_favorites enable row level security;

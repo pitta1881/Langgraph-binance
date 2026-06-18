@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { AuthProvider } from "./auth/AuthProvider";
+import { FavoritesProvider } from "./favorites/FavoritesProvider";
 import "./styles/base.css";
 
 const rootEl = document.getElementById("root");
@@ -12,7 +13,9 @@ ReactDOM.createRoot(rootEl).render(
   <React.StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <App />
+        <FavoritesProvider>
+          <App />
+        </FavoritesProvider>
       </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>

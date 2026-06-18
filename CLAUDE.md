@@ -156,13 +156,17 @@ flowchart LR
 
 ```
 Frontend (Vite :5173)
-    └─► proxy /api/* → Gateway (:8000)
+    └─► proxy /api/* → Gateway (:8000) /api/*
             ├─► Binance API           (heatmap, klines, ticker/banner)
             ├─► CoinGecko API         (trending)
             └─► Agent Service (:8001) (chat → POST /run-agent)
                     └─► LangGraph + Gemini
                           └─► Binance + CoinGecko (per-node enrichment)
 ```
+
+All gateway endpoints live under the `/api` prefix (`/api/health`, `/api/heatmap`, `/api/chat`, `/api/favorites`, `/api/sessions`, `/api/admin/*`, …). Swagger UI stays at the root `/docs` (it's dev tooling, not part of the API contract).
+
+In dev: the frontend calls relative `/api/...` paths; Vite's proxy in `vite.config.ts` forwards them as-is to `localhost:8000`. In prod (single image — see `backend-node/Dockerfile`): the gateway serves both the SPA at `/` and the API at `/api/*` on the same origin, so the same relative paths just work — `VITE_API_URL` does NOT need to be set unless you want to override the default `/api`.
 
 ### Gateway (`backend-node/`)
 
@@ -263,7 +267,7 @@ The shared shapes live at `shared/types/chat.ts` (`ConversationTurn`, extended `
 - **`src/api.ts`** — `API_BASE` + `getJson`/`postJson` helpers (single source of truth for the gateway URL).
 - **`src/hooks/{useFetch,usePolling}.ts`** — `AbortController`-aware data hooks used by every sidebar panel.
 - **`src/styles/base.css`** — Tailwind v4 entry point. Declares `@theme` with all design tokens (colors, animations). Also contains `@layer base` (reset, body, scrollbars), `@layer utilities` (keyframe definitions), and `@layer components` (markdown descendant selectors for `.chat__bubble` that can't be expressed as utility classes).
-- `/api/*` requests are proxied by Vite (`vite.config.ts`) to `localhost:8000` (the gateway).
+- `/api/*` requests are proxied by Vite (`vite.config.ts`) to `localhost:8000` (the gateway). No `rewrite` — the prefix is passed through so the gateway sees the same path the browser sent. `api.ts` defaults `API_BASE` to `'/api'` so every helper (`getJson('/heatmap')`, `postJson('/chat', …)`, etc.) ends up hitting `/api/heatmap`, `/api/chat`, etc.
 
 **Styling**: Tailwind v4 via `@tailwindcss/vite` plugin. No CSS files per component — all styles are inline utility classes. Design tokens defined in `@theme` are available as Tailwind classes (e.g. `bg-bg-raised`, `text-text-muted`, `text-green`). Dynamic color values (heatmap tiles, context bar fill) use `var(--color-*)` in inline `style={}` props since they are runtime-computed.
 

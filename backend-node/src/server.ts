@@ -19,9 +19,11 @@ import { authPlugin } from './plugins/auth.ts';
 import { swaggerPlugin } from './plugins/swagger.ts';
 import { adminRoutes } from './routes/admin.ts';
 import { chatRoutes } from './routes/chat.ts';
+import { favoritesRoutes } from './routes/favorites.ts';
 import { healthRoutes } from './routes/health.ts';
 import { heatmapRoutes } from './routes/heatmap.ts';
 import { klinesRoutes } from './routes/klines.ts';
+import { sessionsRoutes } from './routes/sessions.ts';
 import { tickerBannerRoutes } from './routes/tickerBanner.ts';
 import { trendingRoutes } from './routes/trending.ts';
 
@@ -78,13 +80,20 @@ async function buildServer() {
   // registration to capture schemas and build the OpenAPI document.
   await fastify.register(swaggerPlugin);
 
-  await fastify.register(healthRoutes);
-  await fastify.register(heatmapRoutes);
-  await fastify.register(tickerBannerRoutes);
-  await fastify.register(klinesRoutes);
-  await fastify.register(trendingRoutes);
-  await fastify.register(chatRoutes);
-  await fastify.register(adminRoutes);
+  await fastify.register(
+    async (api) => {
+      await api.register(healthRoutes);
+      await api.register(heatmapRoutes);
+      await api.register(tickerBannerRoutes);
+      await api.register(klinesRoutes);
+      await api.register(trendingRoutes);
+      await api.register(chatRoutes);
+      await api.register(favoritesRoutes);
+      await api.register(sessionsRoutes);
+      await api.register(adminRoutes);
+    },
+    { prefix: '/api' },
+  );
 
   if (!isDev) {
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -96,7 +105,10 @@ async function buildServer() {
       wildcard: false,
     });
 
-    fastify.setNotFoundHandler(async (_request, reply) => {
+    fastify.setNotFoundHandler(async (request, reply) => {
+      if (request.url.startsWith('/api/')) {
+        return reply.code(404).send({ error: 'Not found' });
+      }
       return reply.sendFile('index.html', staticRoot);
     });
   }

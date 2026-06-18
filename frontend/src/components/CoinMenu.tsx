@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { useAuth } from "../auth/useAuth";
+import { useFavorites } from "../favorites/useFavorites";
 
 export interface CoinMenuCoin {
   ticker: string;
@@ -16,6 +18,8 @@ interface Props {
 export function CoinMenu({ coin, position, onClose }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
+  const { user } = useAuth();
+  const { isFavorite, toggle } = useFavorites();
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -73,6 +77,18 @@ export function CoinMenu({ coin, position, onClose }: Props) {
         </span>
         <span>{formatPrice(coin.price)}</span>
       </div>
+      {user && (
+        <button
+          className={itemClass}
+          onClick={() => {
+            void toggle(baseTicker);
+            onClose();
+          }}
+          role="menuitem"
+        >
+          {isFavorite(baseTicker) ? "★ Quitar de favoritos" : "☆ Agregar a favoritos"}
+        </button>
+      )}
       <button className={itemClass} onClick={handleCopy} role="menuitem">
         {copied ? "✓ Copiado" : "Copiar ticker"}
       </button>

@@ -1,7 +1,7 @@
 import { supabase } from './lib/supabase';
 
 export const API_BASE =
-  (import.meta.env["VITE_API_URL"] as string | undefined) ?? "http://localhost:8000";
+  (import.meta.env["VITE_API_URL"] as string | undefined) ?? "/api";
 
 async function authHeaders(extra?: HeadersInit): Promise<Record<string, string>> {
   const base: Record<string, string> = {
@@ -38,6 +38,19 @@ export async function postJson<T, B>(
   });
   if (!res.ok) {
     throw new Error(`POST ${path} failed: HTTP ${res.status} ${res.statusText}`);
+  }
+  return res.json() as Promise<T>;
+}
+
+export async function deleteJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = await authHeaders(init?.headers);
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "DELETE",
+    headers,
+    signal: init?.signal,
+  });
+  if (!res.ok) {
+    throw new Error(`DELETE ${path} failed: HTTP ${res.status} ${res.statusText}`);
   }
   return res.json() as Promise<T>;
 }

@@ -59,7 +59,7 @@ export function Heatmap({ onCoinClick }: Props) {
   };
 
   return (
-    <div className="bg-bg-surface rounded-md overflow-hidden p-2">
+    <div className="bg-bg-surface rounded-md p-2 flex-shrink-0">
       <PanelTitle>🔥 Volumen 24h</PanelTitle>
 
       {loading && !data && (

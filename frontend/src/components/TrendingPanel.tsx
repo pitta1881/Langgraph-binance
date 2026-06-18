@@ -2,9 +2,12 @@ import { useState } from "react";
 import type { KeyboardEvent, MouseEvent } from "react";
 import type { TrendingCoin } from "../../../shared/types/market.ts";
 import { usePolling } from "../hooks/usePolling";
+import { useAuth } from "../auth/useAuth";
+import { useFavorites } from "../favorites/useFavorites";
 import { PanelTitle } from "./PanelTitle";
 import { CoinMenu } from "./CoinMenu";
 import type { CoinMenuCoin } from "./CoinMenu";
+import { FavoriteStar } from "./FavoriteStar";
 
 interface Props {
   onCoinClick?: (ticker: string) => void;
@@ -13,6 +16,8 @@ interface Props {
 export function TrendingPanel({ onCoinClick }: Props) {
   const { data: items, loading, error } = usePolling<TrendingCoin[]>("/trending", 60_000);
   const [menu, setMenu] = useState<{ coin: CoinMenuCoin; x: number; y: number } | null>(null);
+  const { user } = useAuth();
+  const { isFavorite, toggle } = useFavorites();
 
   const handleClick = (e: MouseEvent<HTMLLIElement>, item: TrendingCoin) => {
     e.stopPropagation();
@@ -36,7 +41,7 @@ export function TrendingPanel({ onCoinClick }: Props) {
   };
 
   return (
-    <div className="bg-bg-surface rounded-md overflow-hidden p-2">
+    <div className="bg-bg-surface rounded-md p-2 flex-shrink-0">
       <PanelTitle>📈 Tendencias</PanelTitle>
 
       {loading && !items && (
@@ -80,6 +85,14 @@ export function TrendingPanel({ onCoinClick }: Props) {
                 <span className="text-[0.68rem] text-text-faint flex-shrink-0">
                   #{item.market_cap_rank}
                 </span>
+              )}
+              {user && (
+                <FavoriteStar
+                  active={isFavorite(item.symbol)}
+                  onToggle={() => void toggle(item.symbol)}
+                  className="flex-shrink-0 ml-1"
+                  ariaLabel={`${isFavorite(item.symbol) ? "Quitar" : "Agregar"} ${item.symbol.toUpperCase()} a favoritos`}
+                />
               )}
             </li>
           ))}

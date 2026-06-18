@@ -23,14 +23,20 @@ const DEFAULT_MODEL = 'gemini-3.1-flash-lite';
 
 export interface ChatHandle {
   injectText: (text: string) => void;
+  loadSession: (sessionId: string, messages: Message[]) => void;
+  newConversation: () => string;
 }
 
-interface Message {
+export interface Message {
   role: "user" | "assistant";
   content: string;
   symbol?: string | null;
   intent?: string;
   klines?: Kline[] | null;
+}
+
+interface Props {
+  onSessionChange?: (sessionId: string) => void;
 }
 
 function buildHistory(messages: Message[]): ConversationTurn[] {
@@ -51,7 +57,7 @@ function getContextColor(ratio: number): string {
   return "var(--color-accent)";
 }
 
-export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) {
+export const ChatPanel = forwardRef<ChatHandle, Props>(function ChatPanel({ onSessionChange }, ref) {
   const { user, signInWithGoogle } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -60,8 +66,13 @@ export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const [sessionId] = useState(() => crypto.randomUUID());
-  const [model, setModel] = useState<string>(() => localStorage.getItem('preferred_model') || DEFAULT_MODEL);
+  const [sessionId, setSessionId] = useState<string>(() => crypto.randomUUID());
+  const [model, setModel] = useState<typeof MODELS[number]>(() => {
+    const stored = localStorage.getItem('preferred_model');
+    return (MODELS as readonly string[]).includes(stored ?? '')
+      ? (stored as typeof MODELS[number])
+      : DEFAULT_MODEL;
+  });
 
   useEffect(() => {
     localStorage.setItem('preferred_model', model);
@@ -89,8 +100,27 @@ export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) 
     inputRef.current?.focus();
   }, []);
 
+  const startNewConversation = useCallback((): string => {
+    abortRef.current?.abort();
+    const fresh = crypto.randomUUID();
+    setSessionId(fresh);
+    setMessages([]);
+    setInput("");
+    setLoading(false);
+    onSessionChange?.(fresh);
+    return fresh;
+  }, [onSessionChange]);
+
   useImperativeHandle(ref, () => ({
     injectText: (text: string) => appendToInput(text),
+    loadSession: (id: string, msgs: Message[]) => {
+      abortRef.current?.abort();
+      setSessionId(id);
+      setMessages(msgs);
+      setLoading(false);
+      onSessionChange?.(id);
+    },
+    newConversation: () => startNewConversation(),
   }));
 
   const sendMessage = async () => {
@@ -138,6 +168,7 @@ export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) 
         klines,
       };
       setMessages((prev) => [...prev, assistantMsg]);
+      onSessionChange?.(sessionId);
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;
       const message = err instanceof Error ? err.message : "Error desconocido";
@@ -278,7 +309,7 @@ export const ChatPanel = forwardRef<ChatHandle>(function ChatPanel(_props, ref) 
           </span>
           <button
             className="bg-transparent border border-border rounded-sm text-text-muted text-[0.85rem] px-1.5 py-0 cursor-pointer transition-[color,border-color] duration-200 leading-none flex-shrink-0 hover:text-text-primary hover:border-border-soft focus-visible:outline-2 focus-visible:outline-[#4fc3f7] focus-visible:outline-offset-2"
-            onClick={() => setMessages([])}
+            onClick={() => startNewConversation()}
             aria-label="Nueva conversacion"
             title="Nueva conversacion"
           >
