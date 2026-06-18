@@ -1,7 +1,10 @@
 import { supabase } from './lib/supabase';
 
+// `||` (not `??`) so an empty-string env var also falls back to the default.
+// The Dockerfile declares ARG VITE_API_URL="", so if the deploy doesn't override
+// it we'd otherwise inline `""` and end up hitting `/heatmap` without the prefix.
 export const API_BASE =
-  (import.meta.env["VITE_API_URL"] as string | undefined) ?? "/api";
+  (import.meta.env["VITE_API_URL"] as string | undefined) || "/api";
 
 async function authHeaders(extra?: HeadersInit): Promise<Record<string, string>> {
   const base: Record<string, string> = {
