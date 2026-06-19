@@ -8,7 +8,6 @@ export const API_BASE =
 
 async function authHeaders(extra?: HeadersInit): Promise<Record<string, string>> {
   const base: Record<string, string> = {
-    'Content-Type': 'application/json',
     ...(extra as Record<string, string> | undefined),
   };
   const { data: { session } } = await supabase.auth.getSession();
@@ -33,6 +32,7 @@ export async function postJson<T, B>(
   init?: RequestInit
 ): Promise<T> {
   const headers = await authHeaders(init?.headers);
+  headers['Content-Type'] = 'application/json';
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
     headers,
