@@ -74,3 +74,8 @@ export type KlinesQuery = Static<typeof KlinesQuerySchema>;
 export const SymbolParamSchema = Type.Object({
   symbol: Type.String({ minLength: 2 }),
 });
+
+export const TickerBannerQuerySchema = Type.Object({
+  extra: Type.Optional(Type.String()),
+});
+export type TickerBannerQuery = Static<typeof TickerBannerQuerySchema>;

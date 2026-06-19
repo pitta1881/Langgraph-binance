@@ -5,6 +5,7 @@ import {
   KlineSchema,
   KlinesQuerySchema,
   SymbolParamSchema,
+  TickerBannerQuerySchema,
   TickerSchema,
   TrendingCoinSchema,
 } from './market.schema.ts';
@@ -42,13 +43,20 @@ export function makeMarketController(service: MarketService): FastifyPluginAsync
           summary: 'Top 10 USDT pairs for the scrolling banner',
           description:
             'Same source as /heatmap but trimmed to the top 10 and stripped of the volume field. '
-            + 'Polled every 15s by the frontend.',
+            + 'Polled every 15s by the frontend. Optional `extra` query param accepts a CSV of '
+            + 'symbols (e.g. `BTC,ETH`) that get prepended to the result — used to surface the '
+            + 'authenticated user\'s favorites alongside the top-volume coins.',
+          querystring: TickerBannerQuerySchema,
           response: { 200: Type.Array(TickerSchema) },
         },
       },
       async (request) => {
+        const extra = (request.query.extra ?? '')
+          .split(',')
+          .map((s) => s.trim().toUpperCase())
+          .filter(Boolean);
         try {
-          return await service.getTickerBanner(request.log);
+          return await service.getTickerBanner(extra, request.log);
         } catch (err) {
           request.log.error({ err, route: 'tickerBanner' }, 'upstream failed');
           throw err;

@@ -23,9 +23,27 @@ export class MarketService {
     return topByVolume(tickers, HEATMAP_SIZE);
   }
 
-  async getTickerBanner(log?: FastifyBaseLogger): Promise<Omit<Ticker, 'volume'>[]> {
+  async getTickerBanner(
+    extra: string[] = [],
+    log?: FastifyBaseLogger,
+  ): Promise<Omit<Ticker, 'volume'>[]> {
     const tickers = await this.binance.getUsdtTickers(log);
-    return topByVolume(tickers, BANNER_SIZE).map(({ symbol, price, change_pct }) => ({
+    const top = topByVolume(tickers, BANNER_SIZE);
+
+    const bySymbol = new Map(tickers.map((t) => [t.symbol, t]));
+    const topSymbols = new Set(top.map((t) => t.symbol));
+    const seenExtras = new Set<string>();
+    const extras: Ticker[] = [];
+    for (const sym of extra) {
+      const full = `${sym}USDT`;
+      if (topSymbols.has(full) || seenExtras.has(full)) continue;
+      const hit = bySymbol.get(full);
+      if (!hit) continue;
+      extras.push(hit);
+      seenExtras.add(full);
+    }
+
+    return [...extras, ...top].map(({ symbol, price, change_pct }) => ({
       symbol,
       price,
       change_pct,

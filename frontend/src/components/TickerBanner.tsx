@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { Ticker } from "../../../shared/types/market.ts";
+import { useFavorites } from "../favorites/useFavorites";
 import { usePolling } from "../hooks/usePolling";
 
 function formatPrice(price: number): string {
@@ -17,7 +18,12 @@ function formatPrice(price: number): string {
 const bannerBase = "bg-bg-chat border-b border-border overflow-hidden h-[38px] flex items-center flex-shrink-0";
 
 export function TickerBanner() {
-  const { data, loading, error } = usePolling<Ticker[]>("/ticker/banner", 15_000);
+  const { favorites } = useFavorites();
+  const path = useMemo(() => {
+    const extra = [...favorites].sort().join(",");
+    return extra ? `/ticker/banner?extra=${encodeURIComponent(extra)}` : "/ticker/banner";
+  }, [favorites]);
+  const { data, loading, error } = usePolling<Ticker[]>(path, 15_000);
 
   const doubled = useMemo<Array<Ticker & { half: "a" | "b" }>>(() => {
     if (!data || data.length === 0) return [];
@@ -50,13 +56,26 @@ export function TickerBanner() {
   return (
     <div className={bannerBase} aria-label="Precios en tiempo real">
       <div className="flex animate-ticker-scroll whitespace-nowrap hover:[animation-play-state:paused] focus-within:[animation-play-state:paused]">
-        {doubled.map((t) => (
+        {doubled.map((t) => {
+          const base = t.symbol.replace("USDT", "");
+          const isFav = favorites.has(base);
+          return (
           <span
             key={`${t.symbol}-${t.half}`}
             className="inline-flex gap-1.5 items-center text-[0.78rem] px-5 border-r border-border"
           >
+            {isFav && (
+              <span
+                aria-label="Favorito"
+                title="Favorito"
+                className="leading-none text-[0.72rem]"
+                style={{ color: "var(--color-warning)" }}
+              >
+                ★
+              </span>
+            )}
             <span className="text-text-secondary font-bold tracking-wide">
-              {t.symbol.replace("USDT", "")}
+              {base}
             </span>
             <span className="text-text-primary tabular-nums">${formatPrice(t.price)}</span>
             <span
@@ -68,7 +87,8 @@ export function TickerBanner() {
               {t.change_pct.toFixed(2)}%
             </span>
           </span>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
