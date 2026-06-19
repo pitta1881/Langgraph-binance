@@ -12,6 +12,7 @@ export type AgentIntent =
   | 'analysis'
   | 'market_overview'
   | 'coin_info'
+  | 'recommendation'
   | 'no_symbol'
   | 'off_topic';
 

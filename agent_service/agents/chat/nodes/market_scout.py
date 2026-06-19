@@ -32,15 +32,18 @@ async def market_scout(state: ChatState) -> ChatState:
 
     system = SystemMessage(
         content=(
-            "You are a crypto market analyst. Summarize the market overview based on the data. "
-            "CRITICAL RULE: you may ONLY use the market data provided below. "
-            "Do NOT invent prices or percentages. "
-            "Always respond in Spanish. No greetings or filler. "
-            "Write 4-6 sentences. End with a brief disclaimer: 'Esto no es asesoramiento financiero.'"
+            "Sos un analista de mercado cripto. Resumí el panorama del mercado en base a los datos. "
+            "REGLA CRÍTICA: usá SOLO los datos provistos abajo. "
+            "NO inventes precios ni porcentajes. "
+            "Respondé en español rioplatense.\n\n"
+            "Arrancá con una frase corta que retome lo que preguntó el usuario "
+            "(ej: 'El mercado hoy viene mixto: ...', 'Mirá, hoy hay bastante movimiento — ...'). "
+            "No uses saludos. Escribí 4-6 oraciones en total. "
+            "Cerrá con un disclaimer breve: 'Esto no es asesoramiento financiero.'"
         )
     )
     user = HumanMessage(
-        content=f"User: {state.get('user_message', '')}\n\nMarket data:\n{market_data}"
+        content=f"Usuario: {state.get('user_message', '')}\n\nDatos de mercado:\n{market_data}"
     )
 
     t0 = time.perf_counter()

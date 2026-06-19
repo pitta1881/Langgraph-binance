@@ -1,3 +1,4 @@
+from .advisor import advisor
 from .chart_analyst import chart_analyst
 from .coin_info import coin_info_responder
 from .crypto_expert import crypto_expert
@@ -11,6 +12,7 @@ from .reviewer import reviewer
 from .simple_responses import no_symbol_response, off_topic_response
 
 __all__ = [
+    "advisor",
     "chart_analyst",
     "coin_info_responder",
     "crypto_expert",

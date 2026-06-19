@@ -64,15 +64,17 @@ async def _resolve_gecko_id(symbol: str) -> str | None:
 
     coins = data.get("coins") or []
     base_upper = base.upper()
-    # Prefer an exact symbol match (case-insensitive); fall back to the first
-    # result, which CoinGecko already ranks by market cap relevance.
+    # Require an exact symbol match (case-insensitive). Falling back to the
+    # first result by market-cap rank used to produce confused output for
+    # exotic tickers — e.g. searching "RE" returned Ethereum because there is
+    # no coin with symbol "RE" but ETH ranks high in CoinGecko search.
+    # Better to say "I don't have data on this coin" than to describe a
+    # different one.
     chosen: str | None = None
     for item in coins:
         if (item.get("symbol") or "").upper() == base_upper:
             chosen = item.get("id")
             break
-    if chosen is None and coins:
-        chosen = coins[0].get("id")
 
     logger.debug("coingecko: searching for %r -> %s", base, chosen)
     _id_cache[symbol] = (now, chosen)

@@ -189,9 +189,9 @@ In dev: the frontend calls relative `/api/...` paths; Vite's proxy in `vite.conf
 
 - **`api/main.py`** — minimal FastAPI app exposing only `POST /run-agent` and `GET /health`. Compiles the graph once at startup AND calls `_regenerate_graph_png()` so `artifacts/graph.png` reflects the current pipeline every time the service boots. Failure of the regeneration is logged at warning level and does not block startup.
 - **`agents/chat/graph.py`** — LangGraph `StateGraph` definition.
-- **`agents/chat/nodes.py`** — async node functions updating `ChatState`. Uses `binance/` and `coingecko.py` internally (price_fetcher, market_scout, coin_info nodes). `intent_router` is the only node that consumes `state["history"]` for symbol carryover.
+- **`agents/chat/nodes/`** — package with one file per node (async functions updating `ChatState`). `intent_router` is the only node that consumes `state["history"]` for symbol carryover. All prompts (SystemMessage + HumanMessage) are written in Spanish (rioplatense voseo) for consistency with the user-facing voice.
 - **`agents/shared/state.py`** — `ChatState` TypedDict; includes `history: list[ConversationTurn]` for conversation memory.
-- **`coingecko.py`** — CoinGecko client used by the `coin_info` node. Resolves `Binance symbol → CoinGecko id` dynamically via `GET /api/v3/search` (no hardcoded mapping). Two in-memory caches: `_id_cache` (24h for resolution hits, 10 min for misses) and `_info_cache` (1h for the rendered info block). Network errors bypass the cache so a retry can succeed. Pick rule: prefer an exact case-insensitive symbol match in the search results; fall back to `coins[0]` (CoinGecko already ranks by market cap).
+- **`coingecko.py`** — CoinGecko client used by the `coin_info` node. Resolves `Binance symbol → CoinGecko id` dynamically via `GET /api/v3/search` (no hardcoded mapping). Two in-memory caches: `_id_cache` (24h for resolution hits, 10 min for misses) and `_info_cache` (1h for the rendered info block). Network errors bypass the cache so a retry can succeed. Pick rule: require an EXACT case-insensitive symbol match in the search results; return `None` when there is no match. There used to be a `coins[0]` fallback by market-cap rank, but it produced confused output for exotic tickers (e.g. searching `RE` returned Ethereum because no coin has symbol `RE` and ETH ranks high in CoinGecko's search). Better to honestly say "no data" than to describe a different coin.
 - **`supabase_client.py`** — lazy singleton. `get_client()` returns `None` when creds are missing or the `supabase` package is not installed, so audit writes silently no-op in dev. `insert_trace()` is fire-and-forget — it never raises into the graph, only logs warnings. Imported lazily from `_helpers._log_llm` to avoid circular imports.
 - **`agents/chat/nodes/_helpers.py`** — `_llm(state, temperature)` reads the model dynamically from `state.get("model")` (falls back to `settings.AI_MODEL`). `_log_llm(state, node_name, messages, response_text, latency_ms, error?)` is the single instrumentation point: every node with an LLM call wraps the `ainvoke` in `time.perf_counter()`, then calls `_log_llm` with the latency. When `state["chat_id"]` is present, this fires off the row to `node_traces`.
 
@@ -199,20 +199,32 @@ LangGraph flow:
 ```
 intent_router
 ├─► market_scout → END             (market_overview intent)
+├─► advisor → END                  (recommendation intent — "qué cripto compro?", "1000 USD?")
 ├─► no_symbol → END                (crypto question, coin not identified)
 ├─► off_topic → END                (question is not about crypto at all)
 ├─► coin_info → END                (fundamentals via CoinGecko)
 └─► price_fetcher → data_validator
-        ├─► price_only → END       (price_only intent or bad data)
+        ├─► price_only → END       (price_only intent, or bad/missing price+klines data)
         └─► chart_analyst → finance_expert → crypto_expert → reviewer → END
 ```
 
-`reviewer` synthesizes the three specialist analyses into a final Spanish-language report with BUY/SELL/HOLD recommendation and a Binance trading link. Every node has try/except with a degraded fallback response.
+`reviewer` synthesizes the three specialist analyses into a final report. The output starts with 1-2 conversational sentences that echo back the user's question ("Mirá, ETH viene mostrando una tendencia bajista…"), then the structured `## Recomendación` / `## Análisis` block. As defense in depth, if all three upstream analyses look empty or say "no disponible", the reviewer short-circuits with a one-line honest reply instead of composing 250 words about a void. Every node has try/except with a degraded fallback response.
 
-`off_topic` and `no_symbol` are deliberately distinct terminal nodes with different copy:
-- `no_symbol` ("No identifiqué ninguna criptomoneda… opciones: BTC, ETH…") assumes the user asked about crypto but the symbol was ambiguous.
-- `off_topic` ("Soy un asistente especializado en criptomonedas…") assumes the question is outside scope (weather, greetings, politics).
-Mixing them confuses users — see the "Conversation memory" section below for why this distinction is load-bearing.
+Every terminal node is **LLM-based with a hardcoded Spanish fallback** for the case where the LLM call fails (no silent template-only nodes anymore). The intents are deliberately distinct:
+- `recommendation` (`advisor` node) — user wants investment ideas without naming a coin ("en qué invierto 1000 USD?", "recomendame una cripto"). The advisor pulls real Binance market data and offers diversification, biased by a risk profile inferred from the message.
+- `no_symbol` — user asked about crypto but couldn't disambiguate which coin; agent asks for clarification with popular options.
+- `off_topic` — user asked something outside the crypto domain entirely (weather, greetings); agent redirects warmly.
+- `price_only` — terse price answer; when the upstream fetch failed, the node returns a single honest line ("no estoy encontrando datos en vivo de X en Binance…") instead of pretending.
+
+Mixing `no_symbol` and `off_topic` confuses users — see the "Conversation memory" section below for why this distinction is load-bearing.
+
+The `advisor` node builds **two parallel universes** from Binance tickers:
+- `CORE` — the 15 curated `SYMBOLS` with |%24h| < 50%. Used for conservative/moderate profiles.
+- `WIDE` — top 30 USDT pairs by 24h volume outside `CORE`, with |%24h| < 100%. Used for high-risk profiles. Coins in `WIDE` may not have a clean CoinGecko match, which is why we kept the strict `_resolve_gecko_id` policy.
+
+The advisor prompt detects risk profile from the message ("conservador" / "agresivo" / default moderate) and applies different allocation rules (anchors-heavy for low risk, anchors + momentum for moderate, broader WIDE exposure for high risk with capped per-coin weight).
+
+`data_validator` gates the heavy `chart_analyst → … → reviewer` pipeline. It requires BOTH a real price fetch (no "no disponible" / "sin datos" / "unavailable" markers in `price_context`) AND a non-empty `klines_7d`. If either is missing, it routes to `price_only` to keep the answer short and truthful. This guard is why translating the `price_fetcher` fallback to Spanish broke detection until the markers in `data_validator` were updated.
 
 ### API documentation
 
@@ -243,14 +255,14 @@ Only the `intent_router` node consumes `state["history"]`. The carryover is **de
    - Explicit symbol in current message → always wins over context.
    - Implicit crypto reference ("comprar?", "subió?") → carry over the last assistant symbol.
    - Off-topic question (weather, greetings, code help) → return `intent='off_topic'`, `symbol=null`. **Never** carry over.
-3. Defensive Python normalization runs after: `intent='off_topic'` forces `symbol=None`, and `intent in {price_only, analysis, coin_info}` without a symbol downgrades to `no_symbol`.
+3. Defensive Python normalization runs after: `intent='off_topic'` forces `symbol=None`; `intent='recommendation'` with a stray symbol upgrades to `analysis` (the LLM probably meant the latter); `intent in {price_only, analysis, coin_info}` without a symbol downgrades to `no_symbol`.
 4. `_last_symbol_from_history()` survives only in the `except` path. If the LLM call or JSON parse fails, we fall back to `analysis` with the previous symbol (better than dropping the user's context).
 
 **Why this design**: an earlier version did the carryover in Python regardless of intent. After "deberia vender Tron?" → "cómo está el clima en Miami?" it replayed a TRX analysis because Python had no way to know the new question wasn't crypto. The LLM does — it just needs explicit instructions.
 
 History is capped at 10 turns (`MAX_HISTORY_TURNS` in `ChatPanel.tsx`). Refreshing the browser or clicking the ↺ button in the context bar resets the conversation — there is no server-side store. The context bar shows a progress indicator (`N/MAX contexto`) between the message list and the input area. It only renders when there are messages. The bar color shifts from blue (`--color-accent`) through orange (`#ff9800`) to red (`--color-red`) as the context window fills up (thresholds at 70% and 90%).
 
-The shared shapes live at `shared/types/chat.ts` (`ConversationTurn`, extended `ChatRequest`/`ChatResponse`, `AgentIntent` union including `'off_topic'`). Both the gateway TypeBox schemas and the frontend hooks reference them.
+The shared shapes live at `shared/types/chat.ts` (`ConversationTurn`, extended `ChatRequest`/`ChatResponse`, `AgentIntent` union including `'recommendation'` and `'off_topic'`). Both the gateway TypeBox schemas and the frontend hooks reference them.
 
 ### Frontend
 
@@ -309,6 +321,9 @@ The stub-first ordering is load-bearing: `node_traces.chat_id` has a FK to `chat
 The reviewer node returns Markdown that the frontend renders via `react-markdown`. Structure (enforced by the prompt):
 
 ```
+<1-2 conversational sentences that echo back the user's question,
+e.g. "Mirá, ETH viene mostrando una tendencia bajista en el corto plazo…">
+
 ## Recomendación
 - 📈 **Short term:** BUY | SELL | HOLD
 - 📊 **Medium term:** BUY | SELL | HOLD
@@ -320,4 +335,6 @@ The reviewer node returns Markdown that the frontend renders via `react-markdown
 _Esto no es asesoramiento financiero._
 ```
 
-Recommendations go first on purpose — they're the actionable summary. The Binance trading link is injected by `_inject_binance_link()` after the reviewer returns.
+The conversational intro is required so the answer feels like part of a chat rather than a hard-cut report dump. The structured block stays for the actionable summary. The Binance trading link is injected by `_inject_binance_link()` after the reviewer returns.
+
+If all three upstream analyses (`chart_analysis`, `finance_analysis`, `crypto_analysis`) look empty or contain "no disponible" / "sin datos", the reviewer skips the LLM call and returns a single honest sentence (e.g. "no encontré datos en vivo de HYPE en Binance para armar el análisis. ¿Querés que te explique qué es?"). This guard is the second layer behind `data_validator` — it catches cases where data_validator let something through but the intermediate nodes still failed.

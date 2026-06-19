@@ -4,6 +4,7 @@ from langgraph.graph import END, StateGraph
 
 from ..shared.state import ChatState
 from .nodes import (
+    advisor,
     chart_analyst,
     coin_info_responder,
     crypto_expert,
@@ -33,6 +34,7 @@ def build_chat_graph() -> StateGraph:
     builder.add_node("reviewer", reviewer)
     builder.add_node("price_only", price_only)
     builder.add_node("market_scout", market_scout)
+    builder.add_node("advisor", advisor)
     builder.add_node("no_symbol", no_symbol_response)
     builder.add_node("off_topic", off_topic_response)
     builder.add_node("coin_info", coin_info_responder)
@@ -45,6 +47,7 @@ def build_chat_graph() -> StateGraph:
         {
             "price_fetcher": "price_fetcher",
             "market_scout": "market_scout",
+            "advisor": "advisor",
             "no_symbol": "no_symbol",
             "off_topic": "off_topic",
             "coin_info": "coin_info",
@@ -67,6 +70,7 @@ def build_chat_graph() -> StateGraph:
     builder.add_edge("reviewer", END)
     builder.add_edge("price_only", END)
     builder.add_edge("market_scout", END)
+    builder.add_edge("advisor", END)
     builder.add_edge("no_symbol", END)
     builder.add_edge("off_topic", END)
     builder.add_edge("coin_info", END)

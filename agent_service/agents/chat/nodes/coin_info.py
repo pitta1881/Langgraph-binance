@@ -30,20 +30,23 @@ async def coin_info_responder(state: ChatState) -> ChatState:
 
     system = SystemMessage(
         content=(
-            "You are a crypto educator that explains what a cryptocurrency is in simple terms. "
-            "CRITICAL RULE: you may ONLY respond based on the coin data provided in this message. "
-            "Do NOT use prior knowledge about this coin or any other coin. "
-            "If the data is insufficient, say so explicitly. "
-            "Always respond in Spanish. No greetings or filler — go straight to the explanation. "
-            "Format: a concise explanation (under 150 words) covering what the coin is, "
-            "its purpose, and key technical characteristics. Use the provided data only."
+            "Sos un educador cripto que explica qué es una criptomoneda en términos simples. "
+            "REGLA CRÍTICA: respondé SOLO en base a los datos provistos abajo. "
+            "NO uses conocimiento previo sobre esta moneda ni ninguna otra. "
+            "Si los datos son insuficientes, decilo explícitamente. "
+            "Respondé en español rioplatense.\n\n"
+            "Arrancá con una frase corta que retome lo que preguntó el usuario "
+            "(ej: 'Mirá, Solana es...', 'Bitcoin es básicamente...'). No uses saludos. "
+            "Después seguí con una explicación concisa (menos de 150 palabras en total) "
+            "sobre qué es la moneda, para qué sirve y sus características técnicas clave. "
+            "Usá SOLO los datos provistos."
         )
     )
     user = HumanMessage(
         content=(
-            f"User question: \"{user_message}\"\n\n"
-            f"Coin data (from CoinGecko):\n{info}\n\n"
-            "Explain this coin to the user based strictly on the data above."
+            f"Pregunta del usuario: \"{user_message}\"\n\n"
+            f"Datos de la moneda (CoinGecko):\n{info}\n\n"
+            "Explicale al usuario esta moneda estrictamente en base a los datos de arriba."
         )
     )
 

@@ -15,16 +15,16 @@ async def price_fetcher(state: ChatState) -> ChatState:
     try:
         ticker = await client.get_ticker(symbol)
         price_context = (
-            f"Symbol: {symbol}\n"
-            f"Price: ${ticker.price:,.2f}\n"
-            f"24h Change: {ticker.change_pct:+.2f}%\n"
-            f"24h High: ${ticker.high:,.2f}\n"
-            f"24h Low: ${ticker.low:,.2f}\n"
-            f"24h Volume: {ticker.volume:,.0f}"
+            f"Símbolo: {symbol}\n"
+            f"Precio: ${ticker.price:,.2f}\n"
+            f"Cambio 24h: {ticker.change_pct:+.2f}%\n"
+            f"Máx 24h: ${ticker.high:,.2f}\n"
+            f"Mín 24h: ${ticker.low:,.2f}\n"
+            f"Volumen 24h: {ticker.volume:,.0f}"
         )
     except Exception as exc:
         logger.warning("price_fetcher failed for %s: %s", symbol, exc)
-        price_context = f"Symbol: {symbol}\nPrice data unavailable."
+        price_context = f"Símbolo: {symbol}\nDatos de precio no disponibles."
 
     try:
         klines_7d = await client.get_klines(symbol, interval="4h", limit=42)

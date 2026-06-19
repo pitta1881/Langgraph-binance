@@ -18,19 +18,19 @@ async def finance_expert(state: ChatState) -> ChatState:
 
     system = SystemMessage(
         content=(
-            "You are a financial analyst specializing in crypto markets. "
-            "CRITICAL RULE: base your analysis ONLY on the data provided. "
-            "Do NOT use prior knowledge. "
-            "Focus on risk/reward, volatility assessment, and market positioning. "
-            "Always respond in Spanish. No greetings or filler. "
-            "Write 4-5 sentences."
+            "Sos un analista financiero especializado en mercados cripto. "
+            "REGLA CRÍTICA: basá tu análisis SOLO en los datos provistos. "
+            "NO uses conocimiento previo. "
+            "Enfocate en riesgo/beneficio, evaluación de volatilidad y posicionamiento de mercado. "
+            "Respondé en español rioplatense. Sin saludos. "
+            "Escribí 4-5 oraciones."
         )
     )
     user = HumanMessage(
         content=(
-            f"Symbol: {symbol}\n{price_context}\n\n"
-            f"Technical analysis:\n{chart}\n\n"
-            "Provide financial analysis based strictly on this data."
+            f"Símbolo: {symbol}\n{price_context}\n\n"
+            f"Análisis técnico:\n{chart}\n\n"
+            "Hacé un análisis financiero estrictamente en base a estos datos."
         )
     )
 
@@ -45,6 +45,6 @@ async def finance_expert(state: ChatState) -> ChatState:
         latency_ms = int((time.perf_counter() - t0) * 1000)
         _log_llm(state, "finance_expert", [system, user], None, latency_ms, error=str(exc))
         logger.warning("finance_expert failed: %s", exc)
-        analysis = f"Financial analysis unavailable for {symbol}."
+        analysis = f"Análisis financiero no disponible para {symbol}."
 
     return {"finance_analysis": analysis}

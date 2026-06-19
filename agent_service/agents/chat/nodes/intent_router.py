@@ -21,38 +21,45 @@ async def intent_router(state: ChatState) -> ChatState:
     history_block = _format_history_for_router(history)
 
     system_parts = [
-        "You classify user messages into intents for a crypto assistant. "
-        "Respond with ONLY a JSON object: {\"intent\": \"...\", \"symbol\": \"...\"}.\n\n"
+        "Clasificás mensajes del usuario en intents para un asistente cripto. "
+        "Respondé SOLO con un objeto JSON: {\"intent\": \"...\", \"symbol\": \"...\"}.\n\n"
         "Intents:\n"
-        "- price_only: user asks for a coin's price\n"
-        "- analysis: user asks for analysis, prediction, or a buy/sell recommendation\n"
-        "- market_overview: user asks about the general market, trending, top movers\n"
-        "- coin_info: user asks what a coin IS, its fundamentals, what it does\n"
-        "- no_symbol: the question is about crypto but no specific coin can be inferred\n"
-        "- off_topic: the question is NOT about crypto at all "
-        "(weather, politics, recipes, code help, sports, greetings, anything outside crypto markets)\n\n"
-        "Symbol format: XXXUSDT (e.g. BTCUSDT). Use null when not applicable.\n\n"
-        "Carryover rules (this is critical):\n"
-        "- If the current message has an EXPLICIT crypto reference (a coin name or symbol), use that. "
-        "Explicit always wins over context.\n"
-        "- If the current message is a crypto question with an IMPLICIT reference "
-        "(pronouns, elision, e.g. 'comprar?', 'subió?', 'y la semana?', 'es buen momento?'), "
-        "carry over the symbol from the most recent assistant turn in the context.\n"
-        "- If the current message is NOT about crypto, return intent='off_topic' and symbol=null. "
-        "NEVER carry over a symbol for off-topic questions, even if the previous turns were about crypto.\n\n"
-        "Examples:\n"
-        "- 'Cómo está el clima en Miami?' (after TRX analysis) -> "
+        "- price_only: el usuario pregunta el precio de una moneda\n"
+        "- analysis: el usuario pide análisis, predicción o recomendación de compra/venta\n"
+        "- market_overview: el usuario pregunta sobre el mercado en general, trending, top movers\n"
+        "- coin_info: el usuario pregunta QUÉ ES una moneda, sus fundamentos, qué hace\n"
+        "- recommendation: el usuario pide ideas de inversión / qué comprar / cómo distribuir plata "
+        "SIN nombrar una moneda específica (ej: 'en qué invierto 1000 USD?', 'recomendame una cripto', "
+        "'qué conviene comprar hoy?', 'cuál me recomendás?'). Si nombra una moneda específica, usá 'analysis'.\n"
+        "- no_symbol: la pregunta es sobre crypto pero no se puede inferir una moneda específica Y no es un pedido de recomendación\n"
+        "- off_topic: la pregunta NO es sobre crypto en absoluto "
+        "(clima, política, recetas, ayuda con código, deportes, saludos, cualquier cosa fuera del mercado cripto)\n\n"
+        "Formato del símbolo: XXXUSDT (ej. BTCUSDT). Usá null cuando no aplique.\n\n"
+        "Reglas de carryover (esto es crítico):\n"
+        "- Si el mensaje actual tiene una referencia EXPLÍCITA a una cripto (nombre o símbolo), usá esa. "
+        "Lo explícito siempre le gana al contexto.\n"
+        "- Si el mensaje actual es una pregunta de crypto con referencia IMPLÍCITA "
+        "(pronombres, elisión, ej: 'comprar?', 'subió?', 'y la semana?', 'es buen momento?'), "
+        "arrastrá el símbolo del turno asistente más reciente del contexto.\n"
+        "- Si el mensaje actual NO es sobre crypto, devolvé intent='off_topic' y symbol=null. "
+        "NUNCA arrastres un símbolo en preguntas off-topic, aunque los turnos anteriores hayan sido sobre crypto.\n\n"
+        "Ejemplos:\n"
+        "- 'Cómo está el clima en Miami?' (después de un análisis de TRX) -> "
         "{\"intent\": \"off_topic\", \"symbol\": null}\n"
-        "- 'Debería vender?' (after TRX analysis) -> "
+        "- 'Debería vender?' (después de un análisis de TRX) -> "
         "{\"intent\": \"analysis\", \"symbol\": \"TRXUSDT\"}\n"
         "- 'Qué es Solana?' -> {\"intent\": \"coin_info\", \"symbol\": \"SOLUSDT\"}\n"
         "- 'hola' -> {\"intent\": \"off_topic\", \"symbol\": null}\n"
         "- 'precio btc' -> {\"intent\": \"price_only\", \"symbol\": \"BTCUSDT\"}\n"
-        "- 'cómo está el mercado?' -> {\"intent\": \"market_overview\", \"symbol\": null}\n\n"
-        "Respond with ONLY the JSON. No prose, no code fences."
+        "- 'cómo está el mercado?' -> {\"intent\": \"market_overview\", \"symbol\": null}\n"
+        "- 'en qué invierto 1000 dólares?' -> {\"intent\": \"recommendation\", \"symbol\": null}\n"
+        "- 'recomendame una cripto' -> {\"intent\": \"recommendation\", \"symbol\": null}\n"
+        "- 'qué conviene comprar hoy?' -> {\"intent\": \"recommendation\", \"symbol\": null}\n"
+        "- 'debería comprar BTC?' -> {\"intent\": \"analysis\", \"symbol\": \"BTCUSDT\"}\n\n"
+        "Respondé SOLO con el JSON. Sin prosa, sin code fences."
     ]
     if history_block:
-        system_parts.append("\n\nConversation context (oldest first):\n" + history_block)
+        system_parts.append("\n\nContexto de la conversación (del más antiguo al más reciente):\n" + history_block)
     system = SystemMessage(content="".join(system_parts))
     user = HumanMessage(content=user_message)
 
@@ -80,6 +87,11 @@ async def intent_router(state: ChatState) -> ChatState:
         # Defensive normalization: off_topic must never carry a symbol.
         if intent == "off_topic":
             symbol = None
+        elif intent == "recommendation":
+            # Recommendation is symbol-free by definition. If the LLM tagged a
+            # symbol it likely meant 'analysis'; otherwise just drop it.
+            if symbol:
+                intent = "analysis"
         elif intent in ("price_only", "analysis", "coin_info") and not symbol:
             # LLM marked it as crypto but couldn't resolve a symbol — downgrade.
             intent = "no_symbol"
@@ -105,6 +117,8 @@ def route_after_intent(state: ChatState) -> str:
         return "off_topic"
     if intent == "market_overview":
         return "market_scout"
+    if intent == "recommendation":
+        return "advisor"
     if intent == "no_symbol":
         return "no_symbol"
     if intent == "coin_info":

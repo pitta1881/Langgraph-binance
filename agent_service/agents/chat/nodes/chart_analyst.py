@@ -22,27 +22,27 @@ async def chart_analyst(state: ChatState) -> ChatState:
         highs = [k["high"] for k in klines]
         lows = [k["low"] for k in klines]
         klines_summary = (
-            f"7d OHLC ({len(klines)} candles, 4h):\n"
-            f"  Range: ${min(lows):,.2f} - ${max(highs):,.2f}\n"
-            f"  Open: ${closes[0]:,.2f} → Close: ${closes[-1]:,.2f}\n"
-            f"  Trend: {'UP' if closes[-1] > closes[0] else 'DOWN'} "
+            f"OHLC 7d ({len(klines)} velas, 4h):\n"
+            f"  Rango: ${min(lows):,.2f} - ${max(highs):,.2f}\n"
+            f"  Apertura: ${closes[0]:,.2f} → Cierre: ${closes[-1]:,.2f}\n"
+            f"  Tendencia: {'ALCISTA' if closes[-1] > closes[0] else 'BAJISTA'} "
             f"({((closes[-1] - closes[0]) / closes[0] * 100):+.2f}%)"
         )
 
     system = SystemMessage(
         content=(
-            "You are a technical chart analyst for crypto. "
-            "CRITICAL RULE: base your analysis ONLY on the price and kline data provided. "
-            "Do NOT use prior knowledge about this coin. "
-            "Identify support/resistance levels, trend direction, and key patterns. "
-            "Always respond in Spanish. No greetings or filler. "
-            "Write 5-6 sentences."
+            "Sos un analista técnico de gráficos cripto. "
+            "REGLA CRÍTICA: basá tu análisis SOLO en los datos de precio y klines provistos. "
+            "NO uses conocimiento previo sobre esta moneda. "
+            "Identificá niveles de soporte/resistencia, dirección de la tendencia y patrones clave. "
+            "Respondé en español rioplatense. Sin saludos. "
+            "Escribí 5-6 oraciones."
         )
     )
     user = HumanMessage(
         content=(
-            f"Symbol: {symbol}\n{price_context}\n\n{klines_summary}\n\n"
-            "Provide technical analysis based strictly on this data."
+            f"Símbolo: {symbol}\n{price_context}\n\n{klines_summary}\n\n"
+            "Hacé un análisis técnico estrictamente en base a estos datos."
         )
     )
 
@@ -57,6 +57,6 @@ async def chart_analyst(state: ChatState) -> ChatState:
         latency_ms = int((time.perf_counter() - t0) * 1000)
         _log_llm(state, "chart_analyst", [system, user], None, latency_ms, error=str(exc))
         logger.error("chart_analyst failed: %s", exc, exc_info=True)
-        analysis = f"Technical analysis unavailable for {symbol}."
+        analysis = f"Análisis técnico no disponible para {symbol}."
 
     return {"chart_analysis": analysis}

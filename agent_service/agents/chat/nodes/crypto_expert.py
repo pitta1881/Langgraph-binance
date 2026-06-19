@@ -19,20 +19,20 @@ async def crypto_expert(state: ChatState) -> ChatState:
 
     system = SystemMessage(
         content=(
-            "You are a crypto ecosystem expert. "
-            "CRITICAL RULE: base your analysis ONLY on the data provided. "
-            "Do NOT use prior knowledge about this coin's fundamentals. "
-            "Focus on on-chain signals, ecosystem context, and sentiment from the data. "
-            "Always respond in Spanish. No greetings or filler. "
-            "Write 4-5 sentences."
+            "Sos un experto en el ecosistema cripto. "
+            "REGLA CRÍTICA: basá tu análisis SOLO en los datos provistos. "
+            "NO uses conocimiento previo sobre los fundamentos de esta moneda. "
+            "Enfocate en señales on-chain, contexto del ecosistema y sentimiento que surjan de los datos. "
+            "Respondé en español rioplatense. Sin saludos. "
+            "Escribí 4-5 oraciones."
         )
     )
     user = HumanMessage(
         content=(
-            f"Symbol: {symbol}\n{price_context}\n\n"
-            f"Technical analysis:\n{chart}\n\n"
-            f"Financial analysis:\n{finance}\n\n"
-            "Provide crypto ecosystem analysis based strictly on this data."
+            f"Símbolo: {symbol}\n{price_context}\n\n"
+            f"Análisis técnico:\n{chart}\n\n"
+            f"Análisis financiero:\n{finance}\n\n"
+            "Hacé un análisis del ecosistema cripto estrictamente en base a estos datos."
         )
     )
 
@@ -47,6 +47,6 @@ async def crypto_expert(state: ChatState) -> ChatState:
         latency_ms = int((time.perf_counter() - t0) * 1000)
         _log_llm(state, "crypto_expert", [system, user], None, latency_ms, error=str(exc))
         logger.warning("crypto_expert failed: %s", exc)
-        analysis = f"Crypto analysis unavailable for {symbol}."
+        analysis = f"Análisis del ecosistema no disponible para {symbol}."
 
     return {"crypto_analysis": analysis}

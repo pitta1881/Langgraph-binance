@@ -20,7 +20,7 @@ class ConversationTurn(TypedDict, total=False):
 
 class ChatState(TypedDict, total=False):
     user_message: str
-    intent: Literal["price_only", "analysis", "market_overview", "coin_info", "no_symbol", "off_topic"]
+    intent: Literal["price_only", "analysis", "market_overview", "coin_info", "recommendation", "no_symbol", "off_topic"]
     symbol: str | None
     coin_info: str
     price_context: str
