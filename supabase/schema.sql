@@ -13,7 +13,9 @@ create table if not exists chats (
   symbol text,
   response text,
   latency_ms int,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- soft-delete: set by the user to hide from their history; admin still sees the row.
+  deleted_at timestamptz
 );
 
 -- 1 row per LLM call inside a node.
@@ -40,6 +42,7 @@ create table if not exists user_favorites (
 );
 
 create index if not exists chats_user_created_idx on chats(user_id, created_at desc);
+create index if not exists idx_chats_user_deleted on chats(user_id, deleted_at);
 create index if not exists chats_session_idx on chats(session_id);
 create index if not exists node_traces_chat_idx on node_traces(chat_id);
 create index if not exists node_traces_chat_created_idx on node_traces(chat_id, created_at);

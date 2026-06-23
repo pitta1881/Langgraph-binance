@@ -29,6 +29,7 @@ void _msgCheck;
 
 export const SessionsResponseSchema = Type.Array(ChatSessionSchema);
 export const SessionMessagesResponseSchema = Type.Array(SessionMessageSchema);
+export const DeleteResponseSchema = Type.Object({ ok: Type.Boolean() });
 
 export const SessionParamSchema = Type.Object({
   id: Type.String({

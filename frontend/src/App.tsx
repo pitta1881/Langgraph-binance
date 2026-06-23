@@ -10,7 +10,7 @@ import { TickerBanner } from "./components/TickerBanner";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { useAuth } from "./auth/useAuth";
 import { AdminDashboard } from "./pages/AdminDashboard";
-import { getJson } from "./api";
+import { deleteJson, getJson } from "./api";
 import type { SessionMessage } from "../../shared/types/sessions.ts";
 
 export interface ChatHandle {
@@ -35,6 +35,20 @@ function HomePage() {
   const handleSessionChange = useCallback((sessionId: string) => {
     setActiveSessionId(sessionId);
     setHistoryRefreshKey((k) => k + 1);
+  }, []);
+
+  const handleDeleteSession = useCallback(async (sessionId: string) => {
+    await deleteJson(`/sessions/${sessionId}`);
+    setHistoryRefreshKey((k) => k + 1);
+    if (sessionId === activeSessionId) {
+      chatRef.current?.newConversation();
+    }
+  }, [activeSessionId]);
+
+  const handleDeleteAll = useCallback(async () => {
+    await deleteJson('/sessions');
+    setHistoryRefreshKey((k) => k + 1);
+    chatRef.current?.newConversation();
   }, []);
 
   const handleLoadSession = useCallback(async (sessionId: string) => {
@@ -217,6 +231,8 @@ function HomePage() {
                 chatRef.current?.newConversation();
                 setHistoryDrawerOpen(false);
               }}
+              onDeleteSession={handleDeleteSession}
+              onDeleteAll={handleDeleteAll}
             />
           </aside>
         )}

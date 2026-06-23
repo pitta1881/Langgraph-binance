@@ -22,6 +22,7 @@ export class SessionsRepository {
       .from('chats')
       .select('session_id, message, created_at')
       .eq('user_id', userId)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .limit(ROW_FETCH_LIMIT);
     if (error) throw new Error(error.message);
@@ -38,8 +39,33 @@ export class SessionsRepository {
       .select('id, message, response, symbol, intent, created_at')
       .eq('session_id', sessionId)
       .eq('user_id', userId)
+      .is('deleted_at', null)
       .order('created_at');
     if (error) throw new Error(error.message);
     return (data ?? []) as SessionMessage[];
+  }
+
+  /**
+   * Soft-deletes all chats belonging to a single session for the given user.
+   * Double-filtered by user_id so a leaked session_id cannot touch another user's data.
+   */
+  async softDeleteSession(userId: string, sessionId: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('chats')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .eq('session_id', sessionId)
+      .is('deleted_at', null);
+    if (error) throw new Error(error.message);
+  }
+
+  /** Soft-deletes ALL non-deleted chats for the given user. */
+  async softDeleteAllForUser(userId: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('chats')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .is('deleted_at', null);
+    if (error) throw new Error(error.message);
   }
 }

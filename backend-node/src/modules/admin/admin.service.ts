@@ -6,6 +6,9 @@ interface SessionSummary {
   started_at: string;
   ended_at: string;
   message_count: number;
+  /** True when the user soft-deleted this session. */
+  deleted: boolean;
+  deleted_at: string | null;
 }
 
 const MAX_SESSIONS = 100;
@@ -30,12 +33,22 @@ export class AdminService {
           started_at: row.created_at,
           ended_at: row.created_at,
           message_count: 1,
+          deleted: row.deleted_at != null,
+          deleted_at: row.deleted_at ?? null,
         });
         continue;
       }
       if (row.created_at < existing.started_at) existing.started_at = row.created_at;
       if (row.created_at > existing.ended_at) existing.ended_at = row.created_at;
       existing.message_count += 1;
+      // Mark the session deleted if ANY row in the group has been soft-deleted,
+      // and track the most recent deletion timestamp.
+      if (row.deleted_at != null) {
+        existing.deleted = true;
+        if (existing.deleted_at == null || row.deleted_at > existing.deleted_at) {
+          existing.deleted_at = row.deleted_at;
+        }
+      }
     }
 
     return Array.from(map.entries())

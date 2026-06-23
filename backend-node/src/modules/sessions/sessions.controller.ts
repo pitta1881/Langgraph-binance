@@ -1,6 +1,7 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { Type } from '@sinclair/typebox';
 import {
+  DeleteResponseSchema,
   SessionMessagesResponseSchema,
   SessionParamSchema,
   SessionsResponseSchema,
@@ -53,6 +54,57 @@ export function makeSessionsController(service: SessionsService): FastifyPluginA
           return await service.getSessionMessages(request.params.id, request.user!.id);
         } catch (err) {
           request.log.error({ err, session_id: request.params.id }, 'sessions: messages query failed');
+          return reply.code(502).send({ error: 'Database error' });
+        }
+      },
+    );
+
+    fastify.delete(
+      '/sessions/:id',
+      {
+        schema: {
+          tags: ['Sessions'],
+          summary: 'Soft-delete a single session (hidden from user history; admin still sees it)',
+          params: SessionParamSchema,
+          response: {
+            200: DeleteResponseSchema,
+            401: Type.Object({ error: Type.String() }),
+            502: Type.Object({ error: Type.String() }),
+          },
+        },
+        preHandler: fastify.verifyAuth,
+      },
+      async (request, reply) => {
+        try {
+          await service.deleteSession(request.params.id, request.user!.id);
+          return { ok: true };
+        } catch (err) {
+          request.log.error({ err, session_id: request.params.id }, 'sessions: delete failed');
+          return reply.code(502).send({ error: 'Database error' });
+        }
+      },
+    );
+
+    fastify.delete(
+      '/sessions',
+      {
+        schema: {
+          tags: ['Sessions'],
+          summary: 'Soft-delete ALL sessions for the current user',
+          response: {
+            200: DeleteResponseSchema,
+            401: Type.Object({ error: Type.String() }),
+            502: Type.Object({ error: Type.String() }),
+          },
+        },
+        preHandler: fastify.verifyAuth,
+      },
+      async (request, reply) => {
+        try {
+          await service.deleteAllSessions(request.user!.id);
+          return { ok: true };
+        } catch (err) {
+          request.log.error({ err }, 'sessions: delete-all failed');
           return reply.code(502).send({ error: 'Database error' });
         }
       },

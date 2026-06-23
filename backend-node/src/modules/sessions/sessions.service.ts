@@ -63,4 +63,12 @@ export class SessionsService {
   getSessionMessages(sessionId: string, userId: string): Promise<SessionMessage[]> {
     return this.repo.listSessionMessages(sessionId, userId);
   }
+
+  deleteSession(sessionId: string, userId: string): Promise<void> {
+    return this.repo.softDeleteSession(userId, sessionId);
+  }
+
+  deleteAllSessions(userId: string): Promise<void> {
+    return this.repo.softDeleteAllForUser(userId);
+  }
 }

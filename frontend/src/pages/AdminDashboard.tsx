@@ -7,6 +7,8 @@ interface SessionRow {
   user_email: string;
   started_at: string;
   message_count: number;
+  deleted: boolean;
+  deleted_at: string | null;
 }
 
 interface ChatRow {
@@ -109,13 +111,14 @@ export function AdminDashboard() {
                     <th className="py-2 pr-4 font-medium">Session ID</th>
                     <th className="py-2 pr-4 font-medium">Email</th>
                     <th className="py-2 pr-4 font-medium">Iniciada</th>
-                    <th className="py-2 font-medium">Mensajes</th>
+                    <th className="py-2 pr-4 font-medium">Mensajes</th>
+                    <th className="py-2 font-medium">Estado</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sessions.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="py-4 text-text-muted text-center">Sin sesiones registradas</td>
+                      <td colSpan={5} className="py-4 text-text-muted text-center">Sin sesiones registradas</td>
                     </tr>
                   )}
                   {sessions.map((s) => (
@@ -131,7 +134,19 @@ export function AdminDashboard() {
                       <td className="py-2.5 pr-4 text-text-muted">
                         {new Date(s.started_at).toLocaleString()}
                       </td>
-                      <td className="py-2.5 text-text-secondary">{s.message_count}</td>
+                      <td className="py-2.5 pr-4 text-text-secondary">{s.message_count}</td>
+                      <td className="py-2.5">
+                        {s.deleted ? (
+                          <span
+                            title={s.deleted_at ? `Borrada el ${new Date(s.deleted_at).toLocaleString()}` : "Borrada por el usuario"}
+                            className="inline-flex items-center gap-1 text-xs text-orange-400 bg-orange-950/30 border border-orange-900/50 px-1.5 py-0.5 rounded"
+                          >
+                            🗑 borrada
+                          </span>
+                        ) : (
+                          <span className="text-xs text-text-faint">—</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

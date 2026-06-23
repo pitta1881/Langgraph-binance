@@ -6,6 +6,8 @@ export const AdminSessionSchema = Type.Object({
   started_at: Type.String(),
   ended_at: Type.String(),
   message_count: Type.Number(),
+  deleted: Type.Boolean(),
+  deleted_at: Type.Union([Type.String(), Type.Null()]),
 });
 
 export const ChatRowSchema = Type.Object({

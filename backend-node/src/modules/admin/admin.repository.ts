@@ -10,6 +10,7 @@ export interface ChatSummaryRow {
   user_email: string;
   created_at: string;
   intent: string | null;
+  deleted_at: string | null;
 }
 
 const SESSION_FETCH_LIMIT = 1000;
@@ -20,7 +21,7 @@ export class AdminRepository {
   async listRecentChatSummaries(): Promise<ChatSummaryRow[]> {
     const { data, error } = await this.supabase
       .from('chats')
-      .select('session_id, user_email, created_at, intent')
+      .select('session_id, user_email, created_at, intent, deleted_at')
       .order('created_at', { ascending: false })
       .limit(SESSION_FETCH_LIMIT);
     if (error) throw new Error(error.message);
